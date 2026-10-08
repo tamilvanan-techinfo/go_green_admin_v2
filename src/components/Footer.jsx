@@ -10,6 +10,7 @@ import {
   AssessmentRounded,
   Settings,
   Description,
+  TextFields
 } from "@mui/icons-material";
 
 import { useLocation, useNavigate } from "react-router-dom";
@@ -36,6 +37,11 @@ const NAV_ITEMS = [
     label: "Reports",
     icon: AssessmentRounded,
     path: "/reports",
+  },
+  {
+    label: "CMS",
+    icon: TextFields,
+    path: "/cms",
   },
   {
     label: "Logs",

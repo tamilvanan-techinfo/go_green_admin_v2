@@ -8,6 +8,7 @@ import Logs from "../screens/Logs";
 import Screens from "../screens/Screens";
 import  Settings  from "../screens/Settings";
 import Reports from "../screens/Reports";
+import Cms from "../screens/Cms/Cms";
 
 function AppRoutes() {
   return (
@@ -37,6 +38,12 @@ function AppRoutes() {
         path="/screen"
         element={
             <Screens />
+        }
+      />
+      <Route
+        path="/cms"
+        element={
+            <Cms />
         }
       />
       <Route
