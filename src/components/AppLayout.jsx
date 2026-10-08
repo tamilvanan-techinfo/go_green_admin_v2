@@ -1,11 +1,10 @@
 import React from "react";
-import { Box } from "@mui/material";
-import { Outlet } from "react-router-dom";
+import { Box, Typography } from "@mui/material";
 
 import AppBar from "../components/AppBar";
 import Footer from "../components/Footer";
 
-function AppLayout() {
+function AppLayout({ children,title }) {
   return (
     <Box
       sx={{
@@ -23,39 +22,46 @@ function AppLayout() {
             : "#F8FAFC",
       }}
     >
-      {/* =========================================================
-          APPLICATION APP BAR
-      ========================================================= */}
+    
       <AppBar />
 
-      {/* =========================================================
-          MAIN APPLICATION CONTENT
-      ========================================================= */}
       <Box
         component="main"
         sx={{
           flex: 1,
-
+          border:'1px solid',
           minWidth: 0,
           minHeight: 0,
 
           position: "relative",
 
           overflow: "auto",
-
-          /*
-           * Bottom spacing prevents the floating macOS-style
-           * footer from covering page content.
-           */
+          pt:7,
           pb: 10,
+          pl:3,
+          pr:3
         }}
       >
-        <Outlet />
+        <Typography
+            component="h1"
+              sx={{
+                fontSize: "28px",
+                fontWeight: 700,
+                lineHeight: 1.2,
+                letterSpacing: "-0.02em",
+
+                color: "text.primary",
+              }}
+        >
+            {title}
+        </Typography>
+        <Box>
+            {children}
+        </Box>
+
       </Box>
 
-      {/* =========================================================
-          FLOATING MACOS-STYLE FOOTER
-      ========================================================= */}
+   
       <Footer />
     </Box>
   );
