@@ -1,4 +1,6 @@
+import React, { useEffect, useRef, useState } from "react";
 import { Box, Typography } from "@mui/material";
+
 import {
   DashboardRounded,
   AccountTreeRounded,
@@ -6,9 +8,11 @@ import {
   GroupsRounded,
   TvRounded,
   AssessmentRounded,
+  Settings,
+  Description,
 } from "@mui/icons-material";
+
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
 import { useTheme } from "@mui/material/styles";
 
 const NAV_ITEMS = [
@@ -22,16 +26,7 @@ const NAV_ITEMS = [
     icon: AccountTreeRounded,
     path: "/allocations",
   },
-  {
-    label: "Projects",
-    icon: BusinessCenterRounded,
-    path: "/projects",
-  },
-  {
-    label: "Participants",
-    icon: GroupsRounded,
-    path: "/participants",
-  },
+ 
   {
     label: "Screens",
     icon: TvRounded,
@@ -42,15 +37,35 @@ const NAV_ITEMS = [
     icon: AssessmentRounded,
     path: "/reports",
   },
+  {
+    label: "Logs",
+    icon: Description,
+    path: "/logs",
+  },
+  {
+    label: "Settings",
+    icon: Settings,
+    path: "/settings",
+  },
 ];
 
 function Footer() {
   const theme = useTheme();
+
   const location = useLocation();
   const navigate = useNavigate();
 
   const [hoveredPath, setHoveredPath] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
+
+  // Timer reference
+  const hideTimerRef = useRef(null);
+
+  /*
+   * How long the footer remains visible after navigation.
+   * 3000 = 3 seconds
+   */
+  const NAVIGATION_VISIBLE_TIME = 3000;
 
   const isActive = (path) => {
     return (
@@ -59,22 +74,112 @@ function Footer() {
     );
   };
 
+  // =========================================================
+  // CLEAR EXISTING HIDE TIMER
+  // =========================================================
+
+  const clearHideTimer = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  };
+
+  // =========================================================
+  // SHOW FOOTER FOR A FEW SECONDS WHEN ROUTE CHANGES
+  // =========================================================
+
+  useEffect(() => {
+    /*
+     * Clear any previous timer.
+     */
+    clearHideTimer();
+
+    /*
+     * Show footer immediately.
+     */
+    setIsVisible(true);
+
+    /*
+     * Hide footer after the configured duration.
+     */
+    hideTimerRef.current = setTimeout(() => {
+      setIsVisible(false);
+      setHoveredPath(null);
+      hideTimerRef.current = null;
+    }, NAVIGATION_VISIBLE_TIME);
+
+    /*
+     * Cleanup timer when component unmounts
+     * or when another navigation happens.
+     */
+    return () => {
+      clearHideTimer();
+    };
+  }, [location.pathname]);
+
+  // =========================================================
+  // MOUSE ENTER
+  // =========================================================
+
+  const handleFooterMouseEnter = () => {
+    /*
+     * Cancel the navigation timer.
+     *
+     * As long as the mouse is inside the footer,
+     * keep it visible.
+     */
+    clearHideTimer();
+
+    setIsVisible(true);
+  };
+
+  // =========================================================
+  // MOUSE LEAVE
+  // =========================================================
+
+  const handleFooterMouseLeave = () => {
+    setHoveredPath(null);
+
+    /*
+     * Hide shortly after leaving the footer.
+     */
+    clearHideTimer();
+
+    hideTimerRef.current = setTimeout(() => {
+      setIsVisible(false);
+      hideTimerRef.current = null;
+    }, 400);
+  };
+
+  // =========================================================
+  // NAVIGATION
+  // =========================================================
+
+  const handleNavigation = (path) => {
+    if (location.pathname === path) {
+      return;
+    }
+
+    navigate(path);
+  };
+
   return (
     <>
       {/* =========================================================
           INVISIBLE FOOTER HIT AREA
 
-          This is exactly where the footer is located.
+          The footer is normally hidden.
 
-          The footer is visually hidden, but this area remains
-          available to detect the mouse.
+          When the mouse enters this area:
+          → Footer appears.
+
+          When the route changes:
+          → Footer automatically appears for 3 seconds.
       ========================================================= */}
       <Box
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => {
-          setIsVisible(false);
-          setHoveredPath(null);
-        }}
+        onMouseEnter={handleFooterMouseEnter}
+        onMouseLeave={handleFooterMouseLeave}
         sx={{
           position: "fixed",
 
@@ -92,12 +197,6 @@ function Footer() {
 
           background: "transparent",
 
-          /*
-           * IMPORTANT:
-           * Do NOT use pointerEvents: none here.
-           *
-           * This invisible area is what detects the mouse.
-           */
           pointerEvents: "auto",
         }}
       >
@@ -119,9 +218,7 @@ function Footer() {
 
             opacity: isVisible ? 1 : 0,
 
-            pointerEvents: isVisible
-              ? "auto"
-              : "none",
+            pointerEvents: isVisible ? "auto" : "none",
 
             transition:
               "opacity 220ms ease, transform 350ms cubic-bezier(0.22, 1, 0.36, 1)",
@@ -228,7 +325,7 @@ function Footer() {
               return (
                 <Box
                   key={path}
-                  onClick={() => navigate(path)}
+                  onClick={() => handleNavigation(path)}
                   onMouseEnter={() => setHoveredPath(path)}
                   onMouseLeave={() => setHoveredPath(null)}
                   sx={{
@@ -340,19 +437,16 @@ function Footer() {
                         left: "50%",
                         top: "50%",
 
-                        transform:
-                          "translate(-50%, -50%)",
+                        transform: "translate(-50%, -50%)",
 
                         borderRadius: "50%",
 
                         background:
                           "radial-gradient(circle, rgba(16,185,129,0.20) 0%, transparent 70%)",
 
-                        opacity:
-                          hovered && !active ? 1 : 0,
+                        opacity: hovered && !active ? 1 : 0,
 
-                        transition:
-                          "opacity 250ms ease",
+                        transition: "opacity 250ms ease",
 
                         pointerEvents: "none",
                       },
@@ -394,15 +488,13 @@ function Footer() {
                     sx={{
                       marginTop: 0.9,
 
-                      fontFamily:
-                        theme.typography.fontFamily,
+                      fontFamily: theme.typography.fontFamily,
 
                       fontSize: "11px",
 
                       lineHeight: 1,
 
-                      fontWeight:
-                        active ? 700 : 600,
+                      fontWeight: active ? 700 : 600,
 
                       letterSpacing: "0.015em",
 
@@ -422,8 +514,7 @@ function Footer() {
                           ? "translateY(-1px)"
                           : "translateY(0)",
 
-                      opacity:
-                        active ? 1 : 0.88,
+                      opacity: active ? 1 : 0.88,
                     }}
                   >
                     {label}
