@@ -50,6 +50,7 @@ function AppBar() {
     try {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const win = getCurrentWindow();
+      console.log("Minimizing window:", win);
       await win.minimize();
     } catch (err) {
       console.error("Minimize failed:", err);
