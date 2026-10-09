@@ -33,7 +33,7 @@ import {
 
 import { alpha } from "@mui/material/styles";
 
-import config from "../config.json";
+import config from "../../config.json";
 
 export const API_BASE = config.apiBase;
 
