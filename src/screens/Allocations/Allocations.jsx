@@ -1,10 +1,10 @@
 
 import React, { useCallback, useState } from "react";
-import AppLayout from "../components/AppLayout";
-import { ToastProvider } from "./Allocations/Ui";
-import CycleSection from "./Allocations/CycleSection";
-import ParticipantSection from "./Allocations/ParticipantSection";
-import CycleAllocations from "./Allocations/CycleAllocations";
+import AppLayout from "../../components/AppLayout";
+import { ToastProvider } from "./Ui";
+import CycleSection from "./CycleSection";
+import ParticipantSection from "./ParticipantSection";
+import CycleAllocations from "./CycleAllocations";
 import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
 import {
   Box,
