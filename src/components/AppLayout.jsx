@@ -20,7 +20,14 @@ function AppLayout({ children, title }) {
         flexDirection: "column",
 
         // Prevent the entire layout from scrolling
-        overflow: "hidden",
+        overflowY: "scroll",
+        scrollbarWidth: "none",
+    msOverflowStyle: "none",
+    "&::-webkit-scrollbar": {
+      display: "none",
+    },
+        
+      
 
         background: theme.palette.background.default,
       }}
@@ -38,9 +45,13 @@ function AppLayout({ children, title }) {
           minHeight: 0,
 
           position: "relative",
-
+          overflowY: "scroll",
+        scrollbarWidth: "none",
+    msOverflowStyle: "none",
+    "&::-webkit-scrollbar": {
+      display: "none",
+    },
           // Prevent scrolling inside main content
-          overflow: "hidden",
 
           pt: 6.5,
           pb: 10,

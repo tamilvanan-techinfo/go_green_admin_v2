@@ -5,7 +5,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "../screens/Dashboard";
 import Allocations from "../screens/Allocations";
 import Logs from "../screens/Logs";
-import Screens from "../screens/Screens";
+import ScreenManager from "../screens/ScreenManager/ScreenManager";
 import  Settings  from "../screens/Settings";
 import Reports from "../screens/Reports";
 import Cms from "../screens/Cms/Cms";
@@ -37,7 +37,7 @@ function AppRoutes() {
       <Route
         path="/screen"
         element={
-            <Screens />
+            <ScreenManager />
         }
       />
       <Route
