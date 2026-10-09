@@ -1010,10 +1010,9 @@ function AppTheme() {
   const newThemeBusy = savingDraftOnly || creatingLive;
 
   return (
-    <Box sx={{ mx: "auto", p: { xs: 2, md: 3 }}}>
-      <Paper
-        variant="outlined"
-        sx={{ borderColor: tokens.border, borderRadius: "14px", p: { xs: 2, md: 3 }, bgcolor: "#fff" }}
+    <Box sx={{ mx: "auto", px: { xs: 2, md: 3 }}}>
+      <Box
+        sx={{ borderColor: tokens.border, borderRadius: "0", p: { xs: 2, md: 3 }, bgcolor: "#fff" }}
       >
         {/* Header */}
         <Stack
@@ -1072,7 +1071,7 @@ function AppTheme() {
           sx={{
             border: `1px solid ${tokens.lineLight}`,
             bgcolor: tokens.surface,
-            borderRadius: "12px",
+        
             p: 2,
             mb: 3,
           }}
@@ -1308,7 +1307,7 @@ function AppTheme() {
             </Button>
           </Stack>
         </Stack>
-      </Paper>
+      </Box>
 
       {/* New theme dialog */}
       <Dialog open={newThemeDialogOpen} onClose={newThemeBusy ? undefined : closeNewThemeDialog} fullWidth maxWidth="xs">
