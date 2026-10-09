@@ -472,19 +472,29 @@ const theme = createTheme({
     // =======================================================
     // TABLE
     // =======================================================
+    
     MuiTableHead: {
       styleOverrides: {
         root: {
           backgroundColor: "#F4F6FF",
 
           "& .MuiTableCell-head": {
-            color: "#475569",
             fontFamily: '"JetBrains Mono", monospace',
             fontSize: "10px",
             fontWeight: 600,
+            lineHeight: 1.4,
             textTransform: "uppercase",
-            letterSpacing: "0.05em",
+            letterSpacing: "0.06em",
+            color: "#64748B",
             borderBottom: "1px solid #D9DEEE",
+          },
+
+          "& .MuiTableCell-head .MuiTypography-root": {
+            font: "inherit",
+            lineHeight: "inherit",
+            letterSpacing: "inherit",
+            textTransform: "inherit",
+            color: "inherit",
           },
         },
       },

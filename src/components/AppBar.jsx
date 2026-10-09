@@ -9,6 +9,8 @@ import {
   Badge,
 } from "@mui/material";
 
+import goGreenIcon from "../assets/app_logo.png";
+
 import {
   BoltRounded,
   SearchRounded,
@@ -127,7 +129,18 @@ function AppBar() {
               boxShadow: "0 1px 3px rgba(4,120,87,0.35)",
             }}
           >
-            <BoltRounded sx={{ fontSize: 15, color: "#FFFFFF" }} />
+              <Box
+                component="img"
+                src={goGreenIcon}
+                alt="Go Green"
+                sx={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+           
           </Box>
 
           <Box>
