@@ -30,6 +30,7 @@ import TvOffIcon from "@mui/icons-material/TvOff";
 import SettingsRemoteIcon from "@mui/icons-material/SettingsRemote";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import WifiTetheringIcon from "@mui/icons-material/WifiTethering";
+import { useSocket } from "../../context/SocketContext";
 
 // ─── Design tokens ──────────────────────────────────────────
 const TEAL = "#22D3C4";
@@ -178,10 +179,10 @@ const gridItemSx = {
 };
 
 // ─── Component ──────────────────────────────────────────────
-export default function Screens() {
+export default function Screens({handleControlFor}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-
+const {  connected, send } = useSocket();
   const [screens, setScreens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -356,40 +357,27 @@ export default function Screens() {
   };
 
   // ─── Toggle live status ───────────────────────────────────
-  const handleToggleLive = async (screen) => {
-    const next = !screen.is_live;
-
-    // Update the UI immediately.
-    setScreens((previous) =>
-      previous.map((item) => ({
-        ...item,
-        is_live:
-          item.id === screen.id
-            ? next
-            : next
-              ? false
-              : item.is_live,
-      }))
-    );
-
+const handleToggleLive = async (screen) => {
     try {
-      const response = await fetch(
-        `${API_BASE}/api/admin/screens/${screen.id}/`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ is_live: next }),
-        }
+      const newIsLive = !screen.is_live;
+
+      // Optimistic update in UI: setting one live forces all others off
+      setScreens((prev) =>
+        prev.map((s) => {
+          if (s.id === screen.id) return { ...s, is_live: newIsLive };
+          if (newIsLive) return { ...s, is_live: false };
+          return s;
+        })
       );
 
-      if (!response.ok) {
-        await fetchScreens();
-      }
-    } catch (error) {
-      console.error("Error updating live status:", error);
-      await fetchScreens();
+      send({
+        type: "set_live_screen",
+        screen_id: screen.id,
+        is_live: newIsLive,
+      });
+    } catch (err) {
+      console.error("Error toggling live status:", err);
+      alert("Error toggling live status");
     }
   };
 
@@ -743,6 +731,7 @@ const SkeletonCard = () => (
                 sx={{ fontSize: "15px !important" }}
               />
             }
+            onClick={() => handleControlFor(screen.path)}
             sx={{
               height: 34,
               minHeight: 34,
@@ -882,6 +871,7 @@ const SkeletonCard = () => (
         p: { xs: 2, sm: 2.5, md: 3 },
         boxSizing: "border-box",
         bgcolor: "background.default",
+        
       }}
     >
     
@@ -933,21 +923,21 @@ const SkeletonCard = () => (
           </Button>
         </Box>
       ) : (
-        <Grid container spacing={2} alignItems="stretch">
+        <Box container spacing={2} alignItems="stretch"
+        sx={{
+        overflowY:'scroll'
+
+        }}
+        >
           {screens.map((screen) => (
-            <Grid
+            <Box
               key={screen.id}
-              item
-              xs={12}
-              sm={6}
-              md={4}
-              lg={3}
-              sx={gridItemSx}
+             
             >
               {renderScreenCard(screen)}
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
       )}
 
       {/* Add / Edit dialog */}
