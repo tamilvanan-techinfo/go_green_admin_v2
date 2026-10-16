@@ -1,5 +1,3 @@
-// src/components/allocations/ParticipantSection.jsx
-
 import React, {
   useCallback,
   useEffect,
@@ -35,6 +33,7 @@ import {
 } from "@mui/material";
 
 import { alpha } from "@mui/material/styles";
+import { COMPACT} from '../../components/Layout'
 
 import {
   API_BASE,
@@ -397,6 +396,7 @@ function ParticipantSection({ onDataChange }) {
         minHeight: 0,
         boxSizing: "border-box",
         overflow: "hidden",
+        [COMPACT]: { height: "auto", overflow: "visible" },
       }}
     >
       {/* =======================================================
@@ -450,6 +450,7 @@ function ParticipantSection({ onDataChange }) {
           display: "flex",
           alignItems: "stretch",
           overflow: "hidden",
+          [COMPACT]: { flex: "0 0 auto", overflow: "visible" },
         }}
       >
         {/* =====================================================
@@ -459,13 +460,14 @@ function ParticipantSection({ onDataChange }) {
         <Grid
           size={{ xs: 12, lg: 8 }}
           sx={{
-            flex: "1 1 0",
+           
             minWidth: 0,
             minHeight: 0,
             height: "100%",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
+            [COMPACT]: { height: "auto", overflow: "visible" },
           }}
         >
           <Stack
@@ -478,6 +480,7 @@ function ParticipantSection({ onDataChange }) {
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
+              [COMPACT]: { flex: "0 0 auto", height: "auto", overflow: "visible" },
             }}
           >
             {/* ─── TABLE TOOLBAR ─────────────────────────────── */}
@@ -497,6 +500,7 @@ function ParticipantSection({ onDataChange }) {
                   flexDirection: { xs: "column", sm: "row" },
                   alignItems: { xs: "stretch", sm: "center" },
                   width: "100%",
+                  flexWrap:"wrap",
                   gap: 2,
                 }}
               >
@@ -662,6 +666,7 @@ function ParticipantSection({ onDataChange }) {
                 minHeight: 0,
                 minWidth: 0,
                 overflow: "hidden",
+                [COMPACT]: { flex: "0 0 auto" },
               }}
             >
               <TableContainer
@@ -673,6 +678,7 @@ function ParticipantSection({ onDataChange }) {
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
                   "&::-webkit-scrollbar": { display: "none" },
+                  [COMPACT]: { flex: "0 0 auto", maxHeight: 420 },
                 }}
               >
                 <Table sx={{ minWidth: 560 }}>
@@ -902,7 +908,7 @@ function ParticipantSection({ onDataChange }) {
             RIGHT — INLINE PANEL
             ===================================================== */}
 
-        <Grid size={{ xs: 12, lg: 4 }}>
+        <Grid size={{ xs: 12, lg: 4 }}  sx={{ minWidth: 0 }}>
           {panel === null ? (
             /* ── Empty state ── */
             <Paper
@@ -916,6 +922,7 @@ function ParticipantSection({ onDataChange }) {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
+                
               }}
             >
               <EditNoteIcon

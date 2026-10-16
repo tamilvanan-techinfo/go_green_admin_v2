@@ -55,6 +55,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import SensorsIcon from "@mui/icons-material/Sensors";
 
 import { api, useToast, fmt2 } from "./Ui";
+import { COMPACT} from '../../components/Layout'
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -156,6 +157,7 @@ function CycleCard({ item, selected, onSelect, onAssign }) {
         cursor: free ? "default" : "pointer",
         opacity: free ? 0.9 : 1,
         transition: "box-shadow 140ms ease, border-color 140ms ease",
+        "&:hover": free ? {} : { transform: "translateY(-2px)" },
         border: selected
           ? `2px solid ${theme.palette.secondary.main}`
           : "1px solid transparent",
@@ -580,11 +582,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
 
 
     
-  
- useEffect(() => {
-  console.log("Selected allocation:", selected);
-  console.log("Active participant:", activeP);
-}, [selected, activeP]);
+
 
   
   const queue = roster.filter((p) => p.id !== selected?.participent);
@@ -846,6 +844,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
         minHeight: 0,
         overflow: "hidden",
         gap: 2,
+        [COMPACT]: { height: "auto", flex: "0 0 auto", overflow: "visible" },
       }}
     >
       {/* ================================================================
@@ -1030,11 +1029,12 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
           display: "grid",
           gridTemplateColumns: {
             xs: "minmax(0, 1fr)",
-            lg: "minmax(0, 1fr) 550px",
+            lg: "minmax(0, 1fr) clamp(400px, 38%, 550px)",
           },
           gap: 2,
           alignItems: "stretch",
           overflow: "hidden",
+          [COMPACT]: { flex: "0 0 auto", overflow: "visible" },
         }}
       >
         {/* ============================================================
@@ -1050,6 +1050,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
               minHeight: 0,
               height: "100%",
               overflow: "hidden",
+              [COMPACT]: { height: "auto", overflow: "visible" },
             }}
           >
          
@@ -1163,6 +1164,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
                 "&::-webkit-scrollbar": {
                   display: "none",
                 },
+                [COMPACT]: { flex: "0 0 auto", height: "auto", maxHeight: 480 },
               }}
             >
               <Grid container spacing={1.5}>
@@ -1207,6 +1209,8 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
               "&::-webkit-scrollbar": {
                 display: "none",
               },
+
+              [COMPACT]: { height: "auto", overflow: "visible" },
             }}
           >
           {!selected ? (
@@ -1229,6 +1233,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
+  [COMPACT]: { height: "auto", overflow: "visible" },
 }}>
               <CardContent sx={{
   flex: "1 1 0",
@@ -1241,6 +1246,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
   "&::-webkit-scrollbar": {
     display: "none",
   },
+  [COMPACT]: { flex: "0 0 auto", overflow: "visible" },
 }}>
                 <Stack spacing={2.5}>
                   {/* Header */}
@@ -1352,7 +1358,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
       content: '""',
       position: "absolute",
       top: 0,
-      left: "-50%",
+      left: 0,
       width: "45%",
       height: "2px",
       background:
@@ -1361,8 +1367,8 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
       pointerEvents: "none",
 
       "@keyframes activeParticipantShine": {
-        "0%": { left: "-50%" },
-        "45%, 100%": { left: "120%" },
+        "0%": { transform: "translateX(-120%)" },
+        "45%, 100%": { transform: "translateX(260%)" },
       },
     },
   }}

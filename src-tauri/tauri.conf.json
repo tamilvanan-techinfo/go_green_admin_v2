@@ -13,6 +13,7 @@
 
   "app": {
     "windows": [
+      
       {
         "title": "go_green_admin_v2",
         "width": 800,

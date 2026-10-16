@@ -41,6 +41,8 @@ import {
 
 import { alpha } from "@mui/material/styles";
 
+import { COMPACT} from '../../components/Layout'
+
 
 import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
 import SyncIcon from "@mui/icons-material/Sync";
@@ -586,6 +588,7 @@ function CycleSection({ onDataChange }) {
       minHeight: 0,
       boxSizing: "border-box",
       overflow: "hidden",
+      [COMPACT]: { height: "auto", overflow: "visible" },
       }}>
       {/* ===================================================
           KPIs
@@ -648,6 +651,7 @@ function CycleSection({ onDataChange }) {
           display: "flex",
           alignItems: "stretch",
           overflow: "hidden",
+          [COMPACT]: { flex: "0 0 auto", overflow: "visible" },
         }}
       >
         {/* =================================================
@@ -657,13 +661,14 @@ function CycleSection({ onDataChange }) {
         <Grid
           size={{ xs: 12, lg: 8 }}
           sx={{
-            flex: "1 1 0",
+        
             minWidth: 0,
             minHeight: 0,
             height: "100%",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
+            [COMPACT]: { height: "auto", overflow: "visible" },
           }}
         >
           <Stack
@@ -676,6 +681,7 @@ function CycleSection({ onDataChange }) {
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
+              [COMPACT]: { flex: "0 0 auto", height: "auto", overflow: "visible" },
             }}
           >
           
@@ -689,6 +695,7 @@ function CycleSection({ onDataChange }) {
     borderColor: "divider",
     width: "100%",
     boxSizing: "border-box",
+    
   }}
 >
   <Box
@@ -785,6 +792,7 @@ function CycleSection({ onDataChange }) {
                 minHeight: 0,
                 minWidth: 0,
                 overflow: "hidden",
+                [COMPACT]: { flex: "0 0 auto" },
               }}
             >
               <TableContainer
@@ -798,6 +806,7 @@ function CycleSection({ onDataChange }) {
                   "&::-webkit-scrollbar": {
                   display: "none",
                   },
+                  [COMPACT]: { flex: "0 0 auto", maxHeight: 420 },
                   }}
               >
                 <Table sx={{ minWidth: 520 }}>

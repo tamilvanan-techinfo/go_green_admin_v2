@@ -35,30 +35,25 @@ function AppLayout({ children, title }) {
       <AppBar />
 
       <Box
-        component="main"
-        sx={{
-          flex: 1,
-
-          border: "1px solid",
-
-          minWidth: 0,
-          minHeight: 0,
-
-          position: "relative",
-          overflowY: "scroll",
-        scrollbarWidth: "none",
+  component="main"
+  sx={{
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    border: "1px solid",
+    minWidth: 0,
+    minHeight: 0,
+    position: "relative",
+    overflowY: "auto",
+    scrollbarWidth: "none",
     msOverflowStyle: "none",
-    "&::-webkit-scrollbar": {
-      display: "none",
-    },
-          // Prevent scrolling inside main content
-
-          pt: 6.5,
-          pb: 10,
-          pl: 3,
-          pr: 3,
-        }}
-      >
+    "&::-webkit-scrollbar": { display: "none" },
+    pt: 6.5,
+    pb: 10,
+    pl: 3,
+    pr: 3,
+  }}
+>
         <Typography
           component="h1"
           sx={{
@@ -67,12 +62,14 @@ function AppLayout({ children, title }) {
             lineHeight: 1.2,
             letterSpacing: "-0.02em",
             color: "text.primary",
+            textAlign:
+              "left",
           }}
         >
           {title}
         </Typography>
 
-        <Box sx={{ mt: 1 }}>
+        <Box sx={{ mt: 1, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           {children}
         </Box>
       </Box>
