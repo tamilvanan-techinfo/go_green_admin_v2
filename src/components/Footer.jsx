@@ -15,6 +15,7 @@ import {
 
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
+import { path } from "@tauri-apps/api";
 
 const NAV_ITEMS = [
   {
@@ -49,10 +50,16 @@ const NAV_ITEMS = [
     path: "/logs",
   },
   {
+    label: "Manual Scoring",
+    icon: GroupsRounded,
+    path: "/manualscoring",
+  },
+  {
     label: "Settings",
     icon: Settings,
     path: "/settings",
   },
+  
 ];
 
 function Footer() {

@@ -6,9 +6,10 @@ import Dashboard from "../screens/Dashboard";
 import Allocations from "../screens/Allocations/Allocations";
 import Logs from "../screens/Logs/Logs";
 import ScreenManager from "../screens/ScreenManager/ScreenManager";
-import  Settings  from "../screens/Settings";
+import  Settings  from "../screens/Settings/Settings";
 import Reports from "../screens/Reports";
 import Cms from "../screens/Cms/Cms";
+import ManualScoring from "../screens/ManualScoring";
 
 function AppRoutes() {
   return (
@@ -58,7 +59,12 @@ function AppRoutes() {
             <Reports />
         }
       />
-
+      <Route 
+        path="/manualscoring"
+        element={
+            <ManualScoring />
+        }
+      />
       {/* =========================================================
           404 FALLBACK
       ========================================================= */}

@@ -1,0 +1,1 @@
+export const COMPACT = "@media (max-width: 1199.95px), (max-height: 700px)";

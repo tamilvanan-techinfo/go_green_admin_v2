@@ -1,12 +1,12 @@
 import React from 'react'
 import AppLayout from '../components/AppLayout'
 
-function Settings() {
+function ManualScoring() {
   return (
-    <AppLayout title={"Settings"} >
+    <AppLayout title={"Manual Scoring"} >
 
     </AppLayout>
   )
 }
 
-export default Settings
+export default ManualScoring
