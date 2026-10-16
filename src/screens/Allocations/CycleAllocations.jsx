@@ -1470,7 +1470,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
 
                   {/* Roster Accordion */}
 
-                  <Accordion defaultExpanded disableGutters elevation={0}
+                  <Accordion  disableGutters elevation={0}
                     sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, "&:before": { display: "none" } }}
                   >
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -1544,7 +1544,7 @@ function CycleAllocations({ refreshTrigger, onNavigate }) {
 
                   {/* Add Participants Accordion */}
 
-                  <Accordion defaultExpanded disableGutters elevation={0}
+                  <Accordion  disableGutters elevation={0}
                     sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, "&:before": { display: "none" } }}
                   >
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>

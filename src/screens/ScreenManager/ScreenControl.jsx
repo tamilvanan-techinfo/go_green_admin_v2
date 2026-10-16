@@ -122,11 +122,7 @@ function ScreenControl() {
         console.error("Could not load screen settings:", error);
 
         if (active) {
-          setFeedback({
-            type: "error",
-            message:
-              "Could not load screen settings. Check the backend connection.",
-          });
+       
         }
       } finally {
         if (active) setLoading(false);
@@ -225,10 +221,7 @@ function ScreenControl() {
     if (!hasChanges) return;
 
     if (!connected) {
-      setFeedback({
-        type: "error",
-        message: "WebSocket is disconnected. Reconnect before applying changes.",
-      });
+   
       return;
     }
 
@@ -239,10 +232,7 @@ function ScreenControl() {
       Number(settings.height) <= 0;
 
     if (invalidDimension) {
-      setFeedback({
-        type: "error",
-        message: "Width and height must be positive whole numbers.",
-      });
+     
       return;
     }
 
@@ -253,10 +243,7 @@ function ScreenControl() {
       !Number.isFinite(Number(settings.positionY));
 
     if (invalidPosition) {
-      setFeedback({
-        type: "error",
-        message: "Enter valid numeric X and Y positions.",
-      });
+      
       return;
     }
 
@@ -275,17 +262,11 @@ function ScreenControl() {
       // after receiving a successful acknowledgement instead.
       setBaseline({ ...settings });
 
-      setFeedback({
-        type: "success",
-        message: "Screen settings sent successfully.",
-      });
+     
     } catch (error) {
       console.error("Could not send screen settings:", error);
 
-      setFeedback({
-        type: "error",
-        message: "Could not send screen settings.",
-      });
+     
     } finally {
       setSaving(false);
     }
@@ -306,10 +287,7 @@ function ScreenControl() {
       !electronAPI?.startReceiver ||
       !electronAPI?.stopReceiver
     ) {
-      setFeedback({
-        type: "error",
-        message: "LED UI controls are unavailable in this environment.",
-      });
+  
       return;
     }
 
@@ -323,12 +301,7 @@ function ScreenControl() {
 
       setReceiverOn(Boolean(result?.running ?? checked));
 
-      setFeedback({
-        type: "success",
-        message: checked
-          ? "LED UI started."
-          : "LED UI stopped.",
-      });
+   
     } catch (error) {
       console.error("Failed to toggle LED UI:", error);
 
@@ -339,10 +312,7 @@ function ScreenControl() {
         // Keep the last known receiver status.
       }
 
-      setFeedback({
-        type: "error",
-        message: "Could not change LED UI status.",
-      });
+  
     } finally {
       setReceiverToggling(false);
     }
@@ -526,21 +496,9 @@ function ScreenControl() {
                 lineHeight: 1.4,
               }}
             >
-              Screen Control
+              Screen Resolution Control
             </Typography>
 
-            <Typography
-              sx={{
-                fontSize: 11,
-                color: "text.secondary",
-                lineHeight: 1.5,
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {screen?.name || "CombinedView"}{" "}
-              {screen?.route || "/live/combined-view"}
-            </Typography>
           </Box>
 
           <Chip
@@ -578,20 +536,7 @@ function ScreenControl() {
               DIMENSIONS
             </Typography>
 
-            <Typography
-              sx={{
-                fontSize: 10,
-                fontFamily: '"JetBrains Mono", monospace',
-                color: "text.disabled",
-              }}
-            >
-              {Number(settings.width) > Number(settings.height)
-                ? "Landscape"
-                : "Portrait"}{" "}
-              {settings.width && settings.height
-                ? `${settings.width}:${settings.height}`
-                : ""}
-            </Typography>
+            
           </Stack>
 
           <Stack direction="row" spacing={1}>
@@ -635,15 +580,7 @@ function ScreenControl() {
               POSITION
             </Typography>
 
-            <Typography
-              sx={{
-                fontSize: 10,
-                fontFamily: '"JetBrains Mono", monospace',
-                color: "text.disabled",
-              }}
-            >
-              Window coordinates
-            </Typography>
+        
           </Stack>
 
           <Stack direction="row" spacing={1}>

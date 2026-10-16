@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 import Dashboard from "../screens/Dashboard";
 import Allocations from "../screens/Allocations/Allocations";
-import Logs from "../screens/Logs";
+import Logs from "../screens/Logs/Logs";
 import ScreenManager from "../screens/ScreenManager/ScreenManager";
 import  Settings  from "../screens/Settings/Settings";
 import Reports from "../screens/Reports";
