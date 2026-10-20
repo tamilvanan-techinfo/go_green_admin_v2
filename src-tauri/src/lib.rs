@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
-    fs::{self, OpenOptions},
-    io::{Read, Write},
+    fs::{self,File, OpenOptions},
+    io::{Read,Seek, SeekFrom, Write},
     net::{TcpStream, ToSocketAddrs},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -68,6 +68,7 @@ fn load_state(app: &AppHandle) -> Result<BTreeMap<String, ManagedProcess>, Strin
     serde_json::from_str(&contents).map_err(|e| e.to_string())
 }
 
+
 fn save_state(
     app: &AppHandle,
     state: &BTreeMap<String, ManagedProcess>,
@@ -81,17 +82,46 @@ fn looks_like_backend_root(path: &Path) -> bool {
     path.join("electricity_monitoring_be").is_dir()
         && path.join("local_folder").is_dir()
 }
-
 fn discover_backend_root() -> Result<PathBuf, String> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    // 1. Check the environment inherited by the current app process.
     if let Ok(value) = std::env::var("GoGreen_BE_DIR") {
-        let path = PathBuf::from(value);
-        if looks_like_backend_root(&path) {
-            return Ok(path);
+        if !value.trim().is_empty() {
+            candidates.push(PathBuf::from(value.trim()));
         }
     }
 
-    let mut candidates: Vec<PathBuf> = Vec::new();
+    // 2. Read the latest saved Windows user environment variable.
+    #[cfg(windows)]
+    {
+        if let Ok(output) = Command::new("reg")
+            .args([
+                "query",
+                r"HKCU\Environment",
+                "/v",
+                "GoGreen_BE_DIR",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+        {
+            if output.status.success() {
+                let result = String::from_utf8_lossy(&output.stdout);
 
+                if let Some(line) = result.lines().find(|line| {
+                    line.contains("GoGreen_BE_DIR")
+                }) {
+                    if let Some(value) = line.split_whitespace().last() {
+                        if !value.trim().is_empty() {
+                            candidates.push(PathBuf::from(value.trim()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Preserve app-relative discovery as a fallback.
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             candidates.extend(parent.ancestors().map(Path::to_path_buf));
@@ -103,6 +133,7 @@ fn discover_backend_root() -> Result<PathBuf, String> {
     }
 
     let mut expanded = candidates.clone();
+
     for base in &candidates {
         expanded.push(base.join("backend"));
         expanded.push(base.join("GoGreen_BE"));
@@ -111,29 +142,64 @@ fn discover_backend_root() -> Result<PathBuf, String> {
 
     for candidate in expanded {
         if looks_like_backend_root(&candidate) {
-            return candidate.canonicalize().map_err(|e| e.to_string());
+            return candidate.canonicalize().map_err(|e| {
+                format!(
+                    "Could not resolve backend path '{}': {e}",
+                    candidate.display()
+                )
+            });
         }
     }
 
     Err(
-        "Backend folder not found. Set GoGreen_BE_DIR or place the backend folder beside the app."
+        "Backend folder not found. Check the GoGreen_BE_DIR environment variable and backend installation."
             .to_string(),
     )
 }
 
-fn python_executable(root: &Path, mode: &str) -> Result<PathBuf, String> {
+fn python_executable(root: &Path, requested_mode: &str) -> Result<PathBuf, String> {
+    let saved_mode = fs::read_to_string(root.join(".python_mode"))
+        .ok()
+        .map(|value| value.trim().to_string());
+
+    let mode = saved_mode
+        .as_deref()
+        .filter(|value| !value.is_empty())
+        .unwrap_or(requested_mode);
+
     match mode {
         "venv" => {
             for folder in [".venv", "venv"] {
-                let candidate = root.join(folder).join("Scripts").join("python.exe");
+                let candidate = root
+                    .join(folder)
+                    .join("Scripts")
+                    .join("python.exe");
+
                 if candidate.is_file() {
                     return Ok(candidate);
                 }
             }
-            Err("Virtual environment not found. Create .venv or venv in the backend folder, or select System Python.".to_string())
+
+            Err(
+                "The configured virtual environment was not found. Run the backend installer again."
+                    .to_string(),
+            )
         }
-        "system" => Ok(PathBuf::from("python")),
-        _ => Err("Python mode must be 'venv' or 'system'.".to_string()),
+
+        "system" => {
+            if let Ok(value) = fs::read_to_string(root.join(".python_path")) {
+                let candidate = PathBuf::from(value.trim());
+
+                if candidate.is_file() {
+                    return Ok(candidate);
+                }
+            }
+
+            // Fallback for a system Python already available on PATH.
+            Ok(PathBuf::from("python"))
+        }
+
+        _ => Err(format!("Unsupported Python mode: {mode}")),
     }
 }
 
@@ -637,10 +703,30 @@ fn save_backend_configs(configs: BackendConfigs) -> Result<(), String> {
 }
 
 
+#[derive(Debug, Serialize)]
+struct LogTailResult {
+    lines: Vec<String>,
+    new_offset: u64,
+}
+
+#[tauri::command]
+fn read_log_tail(path: String, offset: u64) -> Result<LogTailResult, String> {
+    let mut file = File::open(&path).map_err(|e| format!("Cannot open log: {e}"))?;
+    let file_len = file.metadata().map_err(|e| e.to_string())?.len();
+    let real_offset = if offset > file_len { 0 } else { offset }; // handles log rotation
+    file.seek(SeekFrom::Start(real_offset)).map_err(|e| e.to_string())?;
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).map_err(|e| e.to_string())?;
+    let new_offset = real_offset + buf.len() as u64;
+    let lines: Vec<String> = buf.lines().filter(|l| !l.trim().is_empty()).map(|l| l.to_string()).collect();
+    Ok(LogTailResult { lines, new_offset })
+}
+
 
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             start_backend,
             stop_backend,
@@ -650,8 +736,11 @@ pub fn run() {
             get_backend_configs,
             save_backend_configs,
             scan_serial_ports,
-            show_backend_terminal
+            show_backend_terminal,
+            read_log_tail
         ])
         .run(tauri::generate_context!())
+        
         .expect("error while running Go Green Admin");
+        
 }

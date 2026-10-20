@@ -23,7 +23,7 @@ import {
   Button, IconButton, Divider, Switch, Slider,
   TextField, Select, MenuItem, FormControl, InputLabel,
   Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions,
-  Tooltip, LinearProgress,
+  Tooltip, LinearProgress, Fade, Skeleton,
 } from '@mui/material';
 
 
@@ -133,14 +133,14 @@ const CardTitle = ({ title, subtitle, action }) => (
 
 // ─── Settings Tab Bar ─────────────────────────────────────────────────────────
 const SETTING_TABS = [
-  {
-    key: 'acmeter',
-    icon: 'offline_bolt',
-    label: 'Monitor AC Meter',
-    
 
+  {
+    key: 'backend',
+    icon: 'dns',
+    label: 'Backend Settings',
    
   },
+
   {
     key: 'changegame',
     icon: 'sports_esports',
@@ -154,11 +154,14 @@ const SETTING_TABS = [
    
   },
   {
-    key: 'backend',
-    icon: 'dns',
-    label: 'Backend Settings',
+    key: 'acmeter',
+    icon: 'offline_bolt',
+    label: 'Monitor AC Meter',
+    
+
    
   },
+
 ];
 
 
@@ -170,11 +173,13 @@ function getInitialSettingsTab() {
 
     return SETTING_TABS.some((tab) => tab.key === saved)
       ? saved
-      : "acmeter";
+      : "backend";
   } catch {
-    return "acmeter";
+    return "backend";
   }
 }
+
+
 
 function SettingsTabBar({ active, onChange }) {
   return (
@@ -209,42 +214,76 @@ function SettingsTabBar({ active, onChange }) {
             sx={{
               appearance: "none",
               WebkitTapHighlightColor: "transparent",
+              position: "relative",
+              overflow: "hidden",
               display: "flex",
               alignItems: "center",
               justifyContent: "flex-start",
               gap: { xs: 1, sm: 1.5 },
               minWidth: 0,
-              minHeight: { xs: 62, sm: 72, md:74  },
+              minHeight: { xs: 62, sm: 72, md: 74 },
               px: { xs: 1.25, sm: 2, md: 2.25 },
               py: { xs: 1.25, sm: 1.75 },
               borderRadius: { xs: "9px", sm: "12px" },
               border: "1px solid",
-              borderColor: isActive ? "#064E3B" : "transparent",
+              borderColor: isActive ? "#A7DCC5" : "transparent",
               bgcolor: isActive ? "#FFFFFF" : "transparent",
               color: isActive ? "#064E3B" : "#475569",
               boxShadow: isActive
-                ? "0 2px 5px rgba(6,78,59,0.08), 0 1px 2px rgba(15,23,42,0.04)"
-                : "none",
+                ? "0 3px 10px rgba(6,78,59,0.09), 0 1px 3px rgba(15,23,42,0.04)"
+                : "0 0 0 rgba(15,23,42,0)",
               cursor: "pointer",
               textAlign: "left",
               font: "inherit",
-              transition:
-                "background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
+
+              transition: [
+                "background-color 220ms ease",
+                "border-color 220ms ease",
+                "box-shadow 240ms ease",
+                "transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+              ].join(", "),
+
               "&:hover": {
-                bgcolor: isActive ? "#FFFFFF" : "#FFFFFF",
-                borderColor: isActive ? "#064E3B" : "#D9DEEE",
+                bgcolor: "#FFFFFF",
+                borderColor: isActive ? "#A7DCC5" : "#D9E7DF",
+                boxShadow: "0 5px 14px rgba(6,78,59,0.08)",
+                transform: "translateY(-2px)",
+
+                "& .settings-tab-icon": {
+                  transform: "scale(1.07)",
+                  bgcolor: "#D1FAE5",
+                  color: "#064E3B",
+                },
+
+                "& .settings-tab-label": {
+                  color: "#064E3B",
+                },
               },
+
               "&:focus-visible": {
                 outline: "2px solid #047857",
                 outlineOffset: 2,
               },
+
               "&:active": {
-                bgcolor: "#ECFDF5",
+                transform: "translateY(0) scale(0.985)",
+                boxShadow: "0 1px 3px rgba(6,78,59,0.06)",
+              },
+
+              "@media (prefers-reduced-motion: reduce)": {
+                transition: "none",
+                "&:hover": {
+                  transform: "none",
+                },
+                "&:active": {
+                  transform: "none",
+                },
               },
             }}
           >
-            {/* Icon container */}
+            {/* Icon */}
             <Box
+              className="settings-tab-icon"
               sx={{
                 width: { xs: 34, sm: 42 },
                 height: { xs: 34, sm: 42 },
@@ -255,7 +294,11 @@ function SettingsTabBar({ active, onChange }) {
                 borderRadius: { xs: "8px", sm: "10px" },
                 bgcolor: isActive ? "#D1FAE5" : "#E9ECF7",
                 color: isActive ? "#064E3B" : "#64748B",
-                transition: "background-color 160ms ease",
+                transition: [
+                  "background-color 240ms ease",
+                  "color 240ms ease",
+                  "transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+                ].join(", "),
               }}
             >
               <span
@@ -270,15 +313,17 @@ function SettingsTabBar({ active, onChange }) {
               </span>
             </Box>
 
-            {/* Tab label */}
+            {/* Label */}
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
+                className="settings-tab-label"
                 sx={{
                   fontSize: { xs: "14px", sm: "16px", md: "18px" },
                   fontWeight: isActive ? 700 : 600,
                   color: isActive ? "#064E3B" : "#334155",
                   lineHeight: 1.4,
                   overflowWrap: "anywhere",
+                  transition: "color 220ms ease",
                 }}
               >
                 {tab.label}
@@ -300,19 +345,24 @@ function SettingsTabBar({ active, onChange }) {
               </Typography>
             </Box>
 
-            {/* Active indicator */}
-            {isActive && (
-              <Box
-                sx={{
-                  width: 5,
-                  alignSelf: "stretch",
-                  flexShrink: 0,
-                  borderRadius: 99,
-                  bgcolor: "#047857",
-                  display: { xs: "none", sm: "block" },
-                }}
-              />
-            )}
+            {/* Animated active indicator */}
+            <Box
+              sx={{
+                width: 4,
+                alignSelf: "stretch",
+                flexShrink: 0,
+                borderRadius: 99,
+                bgcolor: "#047857",
+                opacity: isActive ? 1 : 0,
+                transform: isActive ? "scaleY(1)" : "scaleY(0.35)",
+                transformOrigin: "center",
+                transition: [
+                  "opacity 220ms ease",
+                  "transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+                ].join(", "),
+                display: { xs: "none", sm: "block" },
+              }}
+            />
           </Box>
         );
       })}
@@ -322,145 +372,6 @@ function SettingsTabBar({ active, onChange }) {
 
 
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TAB 2 — Change Game
-// ═══════════════════════════════════════════════════════════════════════════════
-const GAMES = [
-  {
-    id: 'hill',
-    title: 'Hill Climb Watts Challenge',
-    tag: 'Dynamic Grade %',
-    mode: 'Single / Multi',
-    desc: 'Simulates alpine elevation resistance. Smart trainers increase magnetic resistance proportionally to track grade up to 14%.',
-    stats: [['Profile', 'Alpe d\'Huez Sim'], ['Difficulty', 'High (Endurance)'], ['Physics', 'Newtonian v4'], ['Duration', '5–12 min']],
-    action: 'Switch to Hill Climb',
-    iconBg: `linear-gradient(135deg, #064E3B22 0%, #047857aa 100%)`,
-    icon: 'landscape',
-  },
-  {
-    id: 'neon',
-    title: 'Neon Velocity Battle',
-    tag: 'High Agility Sprint',
-    mode: 'Direct Shootout',
-    desc: 'Head-to-head elimination sprint. Cyclists draft behind energy light walls; sudden watt surges trigger nitro boost multipliers.',
-    stats: [['Profile', 'Sprint Arena 200m'], ['Difficulty', 'Max Anaerobic'], ['Physics', 'Arcade Precision'], ['Duration', '90 sec']],
-    action: 'Switch to Neon Battle',
-    iconBg: `linear-gradient(135deg, #0d1f17 0%, #064E3Bdd 100%)`,
-    icon: 'bolt',
-  },
-  {
-    id: 'city',
-    title: 'Eco-Power City Builder',
-    tag: 'Co-Op Gamification',
-    mode: '4-Player Cooperative',
-    desc: 'Collaborative challenge where cumulative watts activate power sectors, monorails, and clean water facilities in real-time.',
-    stats: [['Profile', 'Metropolis Grid'], ['Difficulty', 'Steady Aerobic'], ['Physics', 'Cumulative Joules'], ['Duration', '4–8 min']],
-    action: 'Switch to City Builder',
-    iconBg: `linear-gradient(135deg, #D1FAE5aa 0%, #064E3B44 100%)`,
-    icon: 'apartment',
-  },
-];
-
-function ChangeGameTab({ onToast }) {
-  return (
-    <Stack gap={3}>
-      {/* Active engine */}
-      <SCard>
-        <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ md: 'center' }} justifyContent="space-between" gap={2}>
-          <Stack direction="row" alignItems="center" gap={2}>
-            <Box sx={{
-              width: 60, height: 60, borderRadius: '12px', flexShrink: 0,
-              bgcolor: C.primaryLighter,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 32, color: C.primary }}>sports_motorsports</span>
-            </Box>
-            <Box>
-              <Stack direction="row" alignItems="center" gap={1.5} mb={0.5}>
-                <Pill label="Active Engine" bg={C.primaryLighter} color={C.primary} />
-                <Typography variant="caption" sx={{ color: C.textMuted }}>Arena Display 1-4 Synced</Typography>
-              </Stack>
-              <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3 }}>Velodrome Sprint Pro v2.4</Typography>
-              <Typography variant="body2" sx={{ mt: 0.25 }}>
-                Professional banking track physics, live cadence/watt resistance mapping, and spectator broadcast HUD.
-              </Typography>
-            </Box>
-          </Stack>
-          <Stack direction="row" alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
-            <MonoText sx={{ fontSize: '11px', color: C.textMuted }}>60 FPS Lock</MonoText>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<span className="material-symbols-outlined" style={{ fontSize: 16 }}>replay</span>}
-              onClick={() => onToast('Engine broadcast initiated: Reloading Velodrome Sprint Pro on displays 1-4…')}
-            >
-              Force Reset Engine
-            </Button>
-          </Stack>
-        </Stack>
-      </SCard>
-
-      {/* Library header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Available Gamification Engines</Typography>
-        <Typography variant="body2">Select an experience to deploy to all athlete terminals</Typography>
-      </Stack>
-
-      {/* Game cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3 }}>
-        {GAMES.map((g) => (
-          <SCard key={g.id} sx={{
-            p: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-            transition: 'box-shadow 0.2s, transform 0.2s',
-            '&:hover': { boxShadow: '0 6px 20px rgba(15,23,42,0.1)', transform: 'translateY(-1px)' },
-          }}>
-            {/* Visual area */}
-            <Box sx={{
-              height: 160, background: g.iconBg, position: 'relative',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderBottom: `1px solid ${C.borderLight}`,
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 52, color: 'rgba(255,255,255,0.18)' }}>
-                {g.icon}
-              </span>
-              <Box sx={{ position: 'absolute', top: 10, left: 10 }}>
-                <Pill label={g.tag} bg={`${C.paper}ee`} color={C.textPrimary} mono={false} />
-              </Box>
-              <Box sx={{ position: 'absolute', bottom: 10, right: 10 }}>
-                <Pill label={g.mode} bg={C.primaryLighter} color={C.primary} />
-              </Box>
-            </Box>
-
-            <Stack gap={2} p={2.5} sx={{ flex: 1 }}>
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.75 }}>{g.title}</Typography>
-                <Typography variant="body2">{g.desc}</Typography>
-              </Box>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                {g.stats.map(([k, v]) => (
-                  <Box key={k}>
-                    <MonoText sx={{ fontSize: '10px', color: C.textMuted, display: 'block' }}>{k}</MonoText>
-                    <MonoText sx={{ fontSize: '11px', color: C.textPrimary, fontWeight: 700 }}>{v}</MonoText>
-                  </Box>
-                ))}
-              </Box>
-              <Button
-                fullWidth
-                variant="outlined"
-                size="small"
-                startIcon={<span className="material-symbols-outlined" style={{ fontSize: 16 }}>swap_horiz</span>}
-                onClick={() => onToast(`Deploying ${g.title} to all athlete terminals…`)}
-                sx={{ mt: 'auto', '&:hover': { bgcolor: C.primaryLighter, borderColor: C.primary } }}
-              >
-                {g.action}
-              </Button>
-            </Stack>
-          </SCard>
-        ))}
-      </Box>
-    </Stack>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 3 — Start New Match
@@ -662,6 +573,7 @@ function StartNewMatchTab({ onToast }) {
   );
 }
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 4 — Backend Settings
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -672,198 +584,8 @@ const DAEMONS = [
   { name: 'sqlite-wal-logger',     pid: 'PID 1602', cpu: '0.1% CPU',  status: 'online' },
 ];
 
-function BackendSettingsTab({ onToast }) {
-  const [tokenVisible, setTokenVisible] = useState(false);
-  const [gpuRaster, setGpuRaster]       = useState(true);
-  const [crcCheck, setCrcCheck]         = useState(true);
-  const [bufferSize, setBufferSize]     = useState(256);
 
-  const copy = (text, label) =>
-    navigator.clipboard.writeText(text).then(() => onToast(`Copied: ${label}`));
 
-  return (
-    <Stack gap={3}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 3 }}>
-        {/* Left */}
-        <Stack gap={3}>
-          {/* Telemetry ingestion */}
-          <SCard sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <CardTitle
-              title="High-Frequency Telemetry Ingestion"
-              subtitle="Real-time socket streams handling cadence, watt vectors, and inverter thermals"
-            />
-
-            {/* WS endpoint */}
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: C.textPrimary, display: 'block', mb: 0.75 }}>
-                WebSocket Ingestion Endpoint
-              </Typography>
-              <Stack direction="row" gap={1}>
-                <Box sx={{
-                  flex: 1, bgcolor: C.bg, px: 2, py: 1.25, borderRadius: '8px',
-                  border: `1px solid ${C.borderLight}`, overflowX: 'auto',
-                }}>
-                  <MonoText sx={{ fontSize: '12px', color: C.textPrimary, whiteSpace: 'nowrap' }}>
-                    wss://telemetry.gogreen.internal:8443/cycle/v2/stream
-                  </MonoText>
-                </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<span className="material-symbols-outlined" style={{ fontSize: 14 }}>content_copy</span>}
-                  onClick={() => copy('wss://telemetry.gogreen.internal:8443/cycle/v2/stream', 'WebSocket URL')}
-                  sx={{ flexShrink: 0 }}
-                >
-                  Copy
-                </Button>
-              </Stack>
-              <Stack direction="row" alignItems="center" gap={0.75} mt={0.75}>
-                <StatusDot color={C.success} pulse />
-                <MonoText sx={{ fontSize: '11px', color: C.successDark }}>
-                  Socket status: Connected · 1,240 pkts/sec
-                </MonoText>
-              </Stack>
-            </Box>
-
-            {/* Buffer slider */}
-            <Divider />
-            <Box>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: C.textPrimary, fontSize: '13px', display: 'block' }}>
-                    SQLite Local Fallback Buffer
-                  </Typography>
-                  <Typography variant="body2">Preserves kinematic records during arena LAN disconnects</Typography>
-                </Box>
-                <MonoText sx={{ fontSize: '13px', fontWeight: 700, color: C.textPrimary }}>{bufferSize} packets</MonoText>
-              </Stack>
-              <Slider
-                min={64} max={1024} step={64}
-                value={bufferSize}
-                onChange={(_, v) => setBufferSize(v)}
-                marks={[
-                  { value: 64,   label: '64' },
-                  { value: 256,  label: '256 ✓' },
-                  { value: 1024, label: '1024' },
-                ]}
-                sx={{
-                  color: C.primary,
-                  '& .MuiSlider-rail': { bgcolor: C.borderLight },
-                  '& .MuiSlider-mark': { bgcolor: C.border },
-                  '& .MuiSlider-markLabel': { fontFamily: '"JetBrains Mono", monospace', fontSize: '10px', color: C.textMuted },
-                }}
-              />
-            </Box>
-
-            {/* Toggles */}
-            <Divider />
-            <Stack gap={2.5}>
-              {[
-                { key: 'gpu', val: gpuRaster, set: setGpuRaster, label: 'Hardware GPU Rasterization for Displays', sub: 'Force Vulkan backend on Jumbotron rendering pipelines' },
-                { key: 'crc', val: crcCheck,  set: setCrcCheck,  label: 'Modbus CRC-16 Checksum Enforcement',     sub: 'Silently drop corrupted packets without re-transmission lag' },
-              ].map((row) => (
-                <Stack key={row.key} direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-                  <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: C.textPrimary, fontSize: '13px', display: 'block' }}>{row.label}</Typography>
-                    <Typography variant="body2">{row.sub}</Typography>
-                  </Box>
-                  <Switch checked={row.val} onChange={e => row.set(e.target.checked)} />
-                </Stack>
-              ))}
-            </Stack>
-          </SCard>
-
-          {/* API token */}
-          <SCard sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Master Broadcast API Token</Typography>
-              <Chip label="Bearer Active" color="success" size="small" />
-            </Stack>
-            <Typography variant="body2">
-              Bearer token for REST relays, OBS scoreboard bots, and external timing gates.
-            </Typography>
-            <Stack direction="row" gap={1}>
-              <Box sx={{
-                flex: 1, bgcolor: C.bg, px: 2, py: 1.25, borderRadius: '8px',
-                border: `1px solid ${C.borderLight}`,
-                fontFamily: '"JetBrains Mono", monospace',
-                fontSize: '12px', color: C.textPrimary,
-                letterSpacing: tokenVisible ? '0' : '0.12em',
-                overflow: 'hidden',
-              }}>
-                {tokenVisible ? 'gg_live_84f901cb290e29d71aa104992bb' : '•'.repeat(28)}
-              </Box>
-              <IconButton
-                size="small"
-                onClick={() => setTokenVisible(v => !v)}
-                sx={{ borderRadius: '8px' }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                  {tokenVisible ? 'visibility_off' : 'visibility'}
-                </span>
-              </IconButton>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<span className="material-symbols-outlined" style={{ fontSize: 14 }}>content_copy</span>}
-                onClick={() => copy('gg_live_84f901cb290e29d71aa104992bb', 'API Token')}
-              >
-                Copy Token
-              </Button>
-            </Stack>
-          </SCard>
-        </Stack>
-
-        {/* Right */}
-        <Stack gap={3}>
-          {/* Daemon status */}
-          <SCard sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Daemon Subsystems Status</Typography>
-            <Stack gap={1}>
-              {DAEMONS.map((d) => (
-                <Stack key={d.name} direction="row" alignItems="center" justifyContent="space-between"
-                  sx={{ bgcolor: C.bg, px: 2, py: 1.25, borderRadius: '8px', border: `1px solid ${C.borderLight}` }}>
-                  <Stack direction="row" alignItems="center" gap={1.25}>
-                    <StatusDot color={C.success} />
-                    <MonoText sx={{ fontSize: '12px', color: C.textPrimary, fontWeight: 600 }}>{d.name}</MonoText>
-                  </Stack>
-                  <MonoText sx={{ fontSize: '10px', color: C.textMuted }}>{d.pid} · {d.cpu}</MonoText>
-                </Stack>
-              ))}
-            </Stack>
-            <Divider />
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<span className="material-symbols-outlined" style={{ fontSize: 16 }}>restart_alt</span>}
-              onClick={() => onToast('Restart signal sent to all daemon subsystems.')}
-            >
-              Restart All Daemons
-            </Button>
-          </SCard>
-
-          {/* Host specs */}
-          <SCard>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Host Node Specs</Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              {[
-                ['Architecture', 'Linux x86_64'],
-                ['Kernel', '6.5.0-velodrome'],
-                ['Interface', 'eth0 (10GbE SFP+)'],
-                ['Memory', '32 GB ECC DDR5'],
-              ].map(([k, v]) => (
-                <Box key={k}>
-                  <MonoText sx={{ fontSize: '10px', color: C.textMuted, display: 'block', mb: 0.25 }}>{k}</MonoText>
-                  <MonoText sx={{ fontSize: '12px', color: C.textPrimary, fontWeight: 700 }}>{v}</MonoText>
-                </Box>
-              ))}
-            </Box>
-          </SCard>
-        </Stack>
-      </Box>
-    </Stack>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT — Settings Page
@@ -914,12 +636,42 @@ function Settings() {
         }}
       >
    
-        <SettingsTabBar active={activeTab} onChange={handleSettingsTabChange} />
+      <SettingsTabBar
+        active={activeTab}
+        onChange={handleSettingsTabChange}
+      />
 
-        {activeTab === 'acmeter' && <MonitorACMeter />}
-        {activeTab === 'changegame' && <GameChange />}
-        {activeTab === 'newmatch'   && <StartNewMatchTab   onToast={showToast} />}
-        {activeTab === "backend" && <BackendSettings/>}
+      <Fade key={activeTab} in timeout={220}>
+        <Box
+          sx={{
+            width: "100%",
+            minWidth: 0,
+            animation: "settingsContentEnter 260ms ease-out",
+
+            "@keyframes settingsContentEnter": {
+              from: {
+                opacity: 0.75,
+                transform: "translateY(7px)",
+              },
+              to: {
+                opacity: 1,
+                transform: "translateY(0)",
+              },
+            },
+
+            "@media (prefers-reduced-motion: reduce)": {
+              animation: "none",
+            },
+          }}
+        >
+          {activeTab === "acmeter" && <MonitorACMeter />}
+          {activeTab === "changegame" && <GameChange />}
+          {activeTab === "newmatch" && (
+            <StartNewMatchTab onToast={showToast} />
+          )}
+          {activeTab === "backend" && <BackendSettings />}
+        </Box>
+      </Fade>
       </Box>
 
   

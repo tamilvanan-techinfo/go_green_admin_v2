@@ -21,6 +21,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Skeleton,
 } from "@mui/material";
 
 import { useTheme } from "@mui/material/styles";
@@ -41,13 +42,17 @@ import {
 
 import ReactECharts from "echarts-for-react";
 import { useToast } from "../Allocations/Ui";
-import BottomSheet from '../../components/BottonSheet'
+import BottomSheet from "../../components/BottonSheet";
+import { tokens, studioSx } from "../../core/theme";
 
 const API = "http://localhost:8001";
 const WS = "ws://localhost:8001/ws/meters";
 
 const RECONNECT_MS = 3000;
 const MAX_POINTS = 3600;
+
+// One height shared by the status chip and every toolbar button
+const TOOLBAR_H = 36;
 
 const WINDOW_OPTIONS = [
   { label: "30 seconds", value: 30 },
@@ -116,21 +121,14 @@ const normalizeMeters = (meters) =>
 
 function createNewMeter(meters) {
   const existingNames = new Set(
-    meters.map((meter) =>
-      String(meter.meter_name).trim().toLowerCase()
-    )
+    meters.map((meter) => String(meter.meter_name).trim().toLowerCase())
   );
 
-  const existingIds = new Set(
-    meters.map((meter) => Number(meter.slave_id))
-  );
+  const existingIds = new Set(meters.map((meter) => Number(meter.slave_id)));
 
   let index = 1;
 
-  while (
-    existingNames.has(`meter${index}`) &&
-    index < 10000
-  ) {
+  while (existingNames.has(`meter${index}`) && index < 10000) {
     index += 1;
   }
 
@@ -148,20 +146,13 @@ function createNewMeter(meters) {
   };
 }
 
-function MetricCard({
-  title,
-  value,
-  unit,
-  icon,
-  color,
-  subtitle,
-}) {
+function MetricCard({ title, value, unit, icon, subtitle }) {
   return (
     <Card
       sx={{
+        ...studioSx.card,
         height: "100%",
         minWidth: 0,
-        borderRadius: 2.5,
       }}
     >
       <CardContent
@@ -179,11 +170,7 @@ function MetricCard({
           sx={{ width: "100%" }}
         >
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mb: 1 }}
-            >
+            <Typography sx={{ ...studioSx.cardTitle, mb: 1 }}>
               {title}
             </Typography>
 
@@ -204,9 +191,10 @@ function MetricCard({
                   component="span"
                   sx={{
                     ml: 0.75,
+                    fontFamily: tokens.mono,
                     fontSize: 12,
                     fontWeight: 500,
-                    color: "text.secondary",
+                    color: tokens.textLightSecondary,
                     letterSpacing: 0,
                   }}
                 >
@@ -217,9 +205,10 @@ function MetricCard({
 
             {subtitle && (
               <Typography
-                variant="caption"
-                color="text.secondary"
                 sx={{
+                  ...studioSx.secondaryText,
+                  fontFamily: tokens.mono,
+                  fontSize: "0.65rem",
                   display: "block",
                   mt: 1.5,
                   lineHeight: 1.4,
@@ -230,20 +219,7 @@ function MetricCard({
             )}
           </Box>
 
-          <Box
-            sx={{
-              flexShrink: 0,
-              width: 34,
-              height: 34,
-              borderRadius: 2,
-              display: "grid",
-              placeItems: "center",
-              color,
-              bgcolor: `${color}14`,
-            }}
-          >
-            {icon}
-          </Box>
+          <Box sx={studioSx.iconTile}>{icon}</Box>
         </Stack>
       </CardContent>
     </Card>
@@ -265,7 +241,7 @@ function MeterCard({ meter }) {
         width: { xs: 280, sm: 300 },
         minWidth: { xs: 280, sm: 300 },
         height: "100%",
-        borderRadius: 2.5,
+        borderRadius: "10px",
         boxShadow: "none",
         border: 1,
         borderColor: "divider",
@@ -310,15 +286,17 @@ function MeterCard({ meter }) {
             </Box>
 
             <Box sx={{ minWidth: 0 }}>
-              <Typography
-                fontWeight={700}
-                noWrap
-                title={meter.meter_name}
-              >
+              <Typography fontWeight={700} noWrap title={meter.meter_name}>
                 {meter.meter_name || "Unnamed meter"}
               </Typography>
 
-              <Typography variant="caption" color="text.secondary">
+              <Typography
+                sx={{
+                  ...studioSx.secondaryText,
+                  fontFamily: tokens.mono,
+                  fontSize: "0.65rem",
+                }}
+              >
                 Slave ID: {meter.slave_id ?? "--"}
               </Typography>
             </Box>
@@ -390,6 +368,97 @@ function MeterCard({ meter }) {
   );
 }
 
+function MonitorACMeterSkeleton() {
+  return (
+    <Stack spacing={2}>
+      {/* Summary metrics + meters panel */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "minmax(0, 1fr)",
+            lg: "minmax(0, 1fr) minmax(0, 1fr)",
+          },
+          gap: 1.5,
+        }}
+      >
+        {/* Four metric card skeletons */}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 1.5,
+          }}
+        >
+          {[1, 2, 3, 4].map((item) => (
+            <Card key={item} sx={{ ...studioSx.card, minWidth: 0 }}>
+              <CardContent>
+                <Skeleton variant="text" width="60%" height={22} />
+                <Skeleton variant="text" width="75%" height={38} />
+                <Skeleton variant="text" width="55%" height={18} />
+                <Skeleton
+                  variant="rounded"
+                  width={36}
+                  height={36}
+                  sx={{ mt: 1 }}
+                />
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+
+        {/* Meter cards skeleton */}
+        <Card sx={{ ...studioSx.card, minWidth: 0, minHeight: 250 }}>
+          <CardContent>
+            <Skeleton variant="text" width="30%" height={28} />
+            <Skeleton variant="text" width="20%" height={18} />
+
+            <Stack
+              direction="row"
+              spacing={1.5}
+              sx={{ mt: 2, overflow: "hidden" }}
+            >
+              {[1, 2].map((item) => (
+                <Box
+                  key={item}
+                  sx={{
+                    flex: "0 0 220px",
+                    border: 1,
+                    borderColor: "divider",
+                    borderRadius: 2,
+                    p: 1.5,
+                  }}
+                >
+                  <Skeleton variant="text" width="65%" height={24} />
+                  <Skeleton variant="text" width="40%" height={18} />
+                  <Divider sx={{ my: 1.5 }} />
+                  <Skeleton variant="text" width="90%" height={22} />
+                  <Skeleton variant="text" width="80%" height={22} />
+                  <Skeleton variant="text" width="85%" height={22} />
+                </Box>
+              ))}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Power trend chart skeleton */}
+      <Card sx={studioSx.card}>
+        <CardContent>
+          <Skeleton variant="text" width={180} height={26} />
+          <Skeleton variant="text" width={260} height={20} />
+          <Skeleton
+            variant="rounded"
+            width="100%"
+            height={220}
+            sx={{ mt: 2 }}
+          />
+        </CardContent>
+      </Card>
+    </Stack>
+  );
+}
+
 export default function MonitorACMeter() {
   const theme = useTheme();
   const notify = useToast();
@@ -423,26 +492,19 @@ export default function MonitorACMeter() {
     const data = await response.json();
 
     if (data.status === false) {
-      throw new Error(
-        data.message || "Could not load meter configuration"
-      );
+      throw new Error(data.message || "Could not load meter configuration");
     }
 
     const serverConfig = data.config || {};
-    const loadedMeters = normalizeMeters(
-      data.meters ?? serverConfig.meters
-    );
+    const loadedMeters = normalizeMeters(data.meters ?? serverConfig.meters);
 
     const nextConfig = {
       ...DEFAULT_CONFIG,
       ...serverConfig,
       port: serverConfig.port ?? DEFAULT_CONFIG.port,
-      baudrate: Number(
-        serverConfig.baudrate ?? DEFAULT_CONFIG.baudrate
-      ),
+      baudrate: Number(serverConfig.baudrate ?? DEFAULT_CONFIG.baudrate),
       poll_interval: Number(
-        serverConfig.poll_interval ??
-          DEFAULT_CONFIG.poll_interval
+        serverConfig.poll_interval ?? DEFAULT_CONFIG.poll_interval
       ),
       meters: loadedMeters,
     };
@@ -458,10 +520,9 @@ export default function MonitorACMeter() {
 
     const checkBackend = async () => {
       try {
-        const response = await fetch(
-          `${API}/api/meters/config`,
-          { signal: AbortSignal.timeout(3000) }
-        );
+        const response = await fetch(`${API}/api/meters/config`, {
+          signal: AbortSignal.timeout(3000),
+        });
 
         if (!disposed) {
           setBackendStatus(response.ok ? "running" : "stopped");
@@ -490,8 +551,7 @@ export default function MonitorACMeter() {
       await fetchConfig();
     } catch (error) {
       notify(
-        error.message ||
-          "Could not connect to the meter configuration API",
+        error.message || "Could not connect to the meter configuration API",
         "error"
       );
     } finally {
@@ -526,10 +586,7 @@ export default function MonitorACMeter() {
           );
         }
 
-        reconnectTimerRef.current = setTimeout(
-          connect,
-          RECONNECT_MS
-        );
+        reconnectTimerRef.current = setTimeout(connect, RECONNECT_MS);
 
         return;
       }
@@ -547,10 +604,7 @@ export default function MonitorACMeter() {
         try {
           const packet = JSON.parse(event.data);
 
-          if (
-            packet.type !== "live" ||
-            !Array.isArray(packet.meters)
-          ) {
+          if (packet.type !== "live" || !Array.isArray(packet.meters)) {
             return;
           }
 
@@ -567,8 +621,7 @@ export default function MonitorACMeter() {
 
           const totalPower = nextMeters.reduce(
             (sum, meter) =>
-              sum +
-              (meter.online ? numberOrZero(meter.Power_W) : 0),
+              sum + (meter.online ? numberOrZero(meter.Power_W) : 0),
             0
           );
 
@@ -601,10 +654,7 @@ export default function MonitorACMeter() {
           );
         }
 
-        reconnectTimerRef.current = setTimeout(
-          connect,
-          RECONNECT_MS
-        );
+        reconnectTimerRef.current = setTimeout(connect, RECONNECT_MS);
       };
     };
 
@@ -635,10 +685,7 @@ export default function MonitorACMeter() {
 
   const totalPower = useMemo(
     () =>
-      onlineMeters.reduce(
-        (sum, meter) => sum + numberOrZero(meter.Power_W),
-        0
-      ),
+      onlineMeters.reduce((sum, meter) => sum + numberOrZero(meter.Power_W), 0),
     [onlineMeters]
   );
 
@@ -669,8 +716,7 @@ export default function MonitorACMeter() {
         const liveMeter =
           meters.find(
             (meter) =>
-              Number(meter.slave_id) ===
-              Number(configuredMeter.slave_id)
+              Number(meter.slave_id) === Number(configuredMeter.slave_id)
           ) ||
           meters.find(
             (meter) =>
@@ -692,9 +738,7 @@ export default function MonitorACMeter() {
   const visibleHistory = useMemo(() => {
     const cutoff = Date.now() - chartWindow * 1000;
 
-    return history.filter(
-      (point) => point.timestamp >= cutoff
-    );
+    return history.filter((point) => point.timestamp >= cutoff);
   }, [history, chartWindow]);
 
   const chartOption = useMemo(
@@ -789,10 +833,7 @@ export default function MonitorACMeter() {
     try {
       await fetchConfig();
     } catch (error) {
-      notify(
-        error.message || "Could not load meter configuration",
-        "error"
-      );
+      notify(error.message || "Could not load meter configuration", "error");
     }
   };
 
@@ -804,9 +845,7 @@ export default function MonitorACMeter() {
     setConfig((previous) => ({
       ...previous,
       meters: previous.meters.map((meter, meterIndex) =>
-        meterIndex === index
-          ? { ...meter, [field]: value }
-          : meter
+        meterIndex === index ? { ...meter, [field]: value } : meter
       ),
     }));
   };
@@ -836,9 +875,7 @@ export default function MonitorACMeter() {
 
     setConfig((previous) => ({
       ...previous,
-      meters: previous.meters.filter(
-        (_, meterIndex) => meterIndex !== index
-      ),
+      meters: previous.meters.filter((_, meterIndex) => meterIndex !== index),
     }));
   };
 
@@ -859,15 +896,9 @@ export default function MonitorACMeter() {
       return "Meter names must be unique.";
     }
 
-    const ids = config.meters.map((meter) =>
-      Number(meter.slave_id)
-    );
+    const ids = config.meters.map((meter) => Number(meter.slave_id));
 
-    if (
-      ids.some(
-        (id) => !Number.isInteger(id) || id < 1 || id > 247
-      )
-    ) {
+    if (ids.some((id) => !Number.isInteger(id) || id < 1 || id > 247)) {
       return "Slave IDs must be integers between 1 and 247.";
     }
 
@@ -931,26 +962,19 @@ export default function MonitorACMeter() {
         ...DEFAULT_CONFIG,
         ...serverConfig,
         port: serverConfig.port ?? payload.port,
-        baudrate: Number(
-          serverConfig.baudrate ?? payload.baudrate
-        ),
+        baudrate: Number(serverConfig.baudrate ?? payload.baudrate),
         poll_interval: Number(
           serverConfig.poll_interval ?? payload.poll_interval
         ),
         meters: normalizeMeters(
-          data.meters ??
-            serverConfig.meters ??
-            payload.meters
+          data.meters ?? serverConfig.meters ?? payload.meters
         ),
       });
 
       setConfigOpen(false);
       notify("Meter configuration saved.");
     } catch (error) {
-      notify(
-        error.message || "Could not save meter configuration",
-        "error"
-      );
+      notify(error.message || "Could not save meter configuration", "error");
     } finally {
       setSaving(false);
     }
@@ -960,21 +984,16 @@ export default function MonitorACMeter() {
     window.open(`${API}/api/meters/download-csv`, "_blank");
   };
 
-  // Shared dimensions for the three toolbar buttons.
+  // Shared dimensions for the toolbar buttons (same height as the chip).
   const toolbarButtonSx = {
     minWidth: 100,
-    minHeight: 28,
-    height: 28,
+    minHeight: TOOLBAR_H,
+    height: TOOLBAR_H,
     px: 1.75,
-    py: 2.75,
-    fontSize: 12.5,
-    fontWeight: 600,
-    
+    py: 0,
     whiteSpace: "nowrap",
     flexShrink: 0,
-    "& .MuiButton-startIcon": {
-      mr: 0.75,
-    },
+    "& .MuiButton-startIcon": { mr: 0.75 },
   };
 
   return (
@@ -986,126 +1005,131 @@ export default function MonitorACMeter() {
       }}
     >
       {/* Page toolbar */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={1.5}
-        sx={{
-          mb: 2,
-          width: "100%",
-          minWidth: 0,
-        }}
-      >
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography
-            sx={{
-              fontSize: { xs: 22, sm: 26 },
-              fontWeight: 800,
-              mb: 0.5,
-              textAlign: "left",
-            }}
-          >
-            AC Meter Monitor
-          </Typography>
+      {/* Page toolbar */}
+<Box
+  sx={{
+    display: "flex",
+    flexDirection: { xs: "column", sm: "row" },
+    alignItems: { xs: "stretch", sm: "center" },
+    justifyContent: "space-between",
+    gap: 1.5,
+    mb: 2,
+    width: "100%",
+    minWidth: 0,
+  }}
+>
+  <Box sx={{ minWidth: 0, flex: 1 }}>
+    <Typography
+      sx={{
+        fontWeight: 800,
+        fontSize: "1.05rem",
+        color: tokens.ink,
+        mb: 0.5,
+        textAlign: "left",
+      }}
+    >
+      AC Meter Monitor
+    </Typography>
 
-          <Typography variant="body2" color="text.secondary">
-            Live electrical readings from the configured Modbus meters.
-          </Typography>
-        </Box>
+    <Typography sx={studioSx.secondaryText}>
+      Live electrical readings from the configured Modbus meters.
+    </Typography>
+  </Box>
 
-        <Stack
-          direction="row"
-          spacing={1}
-          flexWrap="wrap"
-          useFlexGap
-          alignItems="center"
-          justifyContent={{ xs: "flex-start", sm: "flex-end" }}
-          sx={{
-            flexShrink: 0,
-            width: { xs: "100%", sm: "auto" },
-            ml: { sm: "auto" },
-          }}
-        >
-          <Chip
-            icon={
-              <Box
-                component="span"
-                sx={{
-                  width: 7,
-                  height: 7,
-                  ml: 1,
-                  borderRadius: "10%",
-                  bgcolor: socketConnected
-                    ? "success.main"
-                    : "error.main",
-                }}
-              />
-            }
-            label={socketConnected ? "LIVE" : "DISCONNECTED"}
-            color={socketConnected ? "success" : "error"}
-            variant="outlined"
-            size="small"
-            sx={{
-              height: 29,
-              fontSize: 11,
-              alignSelf: "center",
-            }}
-          />
+  {/* Chip + buttons: one flex row, everything centred on the same line */}
+ <Box
+  sx={{
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: { xs: "flex-start", sm: "flex-end" },
+    flexWrap: "nowrap",
+    gap: 1,
+    flexShrink: 0,
+    minWidth: 0,
+  }}
+>
+  
+<Chip
+  label={socketConnected ? "LIVE" : "DISCONNECTED"}
+  size="small"
+  sx={{
+    height: 26,
+    boxSizing: "border-box",
+    alignSelf: "center",
+    m: 0,
+    borderRadius: "6px",
+    fontSize: "10px",
+    fontWeight: 700,
+    lineHeight: 1,
+    "& .MuiChip-label": {
+      px: 1,
+      py: 0,
+      lineHeight: 1,
+    },
+    ...(socketConnected
+      ? {
+          color: "#047857",
+          backgroundColor: "#ECFDF5",
+          border: "1px solid #6EE7B7",
+        }
+      : {
+          color: "#DC2626",
+          backgroundColor: "#FEF2F2",
+          border: "1px solid #FCA5A5",
+        }),
+  }}
+/>
 
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<RefreshRounded />}
-            onClick={refreshPage}
-            disabled={loading}
-            sx={toolbarButtonSx}
-          >
-            Refresh
-          </Button>
+<Button
+  variant="outlined"
+  onClick={refreshPage}
+  sx={{
+    height: 32,
+    minHeight: 32,
+    boxSizing: "border-box",
+    alignSelf: "center",
+    whiteSpace: "nowrap",
+  }}
+>
+  <RefreshRounded sx={{ fontSize: 16, mr: 0.5 }} />
+  Refresh
+</Button>
 
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<DownloadRounded />}
-            onClick={downloadCsv}
-            sx={{
-              ...toolbarButtonSx,
-              minWidth: 112,
-            }}
-          >
-            Export CSV
-          </Button>
+<Button
+  variant="outlined"
+  onClick={downloadCsv}
+  sx={{
+    height: 32,
+    minHeight: 32,
+    boxSizing: "border-box",
+    alignSelf: "center",
+    whiteSpace: "nowrap",
+  }}
+>
+  <DownloadRounded sx={{ fontSize: 16, mr: 0.5 }} />
+  Export CSV
+</Button>
 
-          <Button
-            size="small"
-            variant="contained"
-            startIcon={<SettingsRounded />}
-            onClick={openConfig}
-            sx={{
-              ...toolbarButtonSx,
-              minWidth: 108,
-            }}
-          >
-            Configure
-          </Button>
-        </Stack>
-      </Stack>
+<Button
+  variant="contained"
+  onClick={openConfig}
+  sx={{
+    height: 32,
+    minHeight: 32,
+    boxSizing: "border-box",
+    alignSelf: "center",
+    whiteSpace: "nowrap",
+  }}
+>
+  <SettingsRounded sx={{ fontSize: 16, mr: 0.5 }} />
+  Configure
+</Button>
 
+</Box>
+</Box>
       {loading ? (
-        <Box
-          sx={{
-            minHeight: 220,
-            display: "grid",
-            placeItems: "center",
-          }}
-        >
-          <Stack alignItems="center" spacing={1.5}>
-            <CircularProgress size={28} />
-            <Typography variant="body2" color="text.secondary">
-              Connecting to meter service…
-            </Typography>
-          </Stack>
-        </Box>
+        <MonitorACMeterSkeleton />
       ) : (
         <Stack spacing={2}>
           {/* Summary metrics + meters panel */}
@@ -1142,7 +1166,6 @@ export default function MonitorACMeter() {
                 value={formatNumber(totalPower)}
                 unit="W"
                 icon={<BoltRounded />}
-                color={theme.palette.warning.main}
                 subtitle="Combined online meters"
               />
 
@@ -1151,7 +1174,6 @@ export default function MonitorACMeter() {
                 value={formatNumber(totalCurrent)}
                 unit="A"
                 icon={<SpeedRounded />}
-                color={theme.palette.info.main}
                 subtitle="Sum of online meters"
               />
 
@@ -1160,7 +1182,6 @@ export default function MonitorACMeter() {
                 value={formatNumber(averageVoltage)}
                 unit="V"
                 icon={<TimelineRounded />}
-                color={theme.palette.secondary.main}
                 subtitle="Online meters only"
               />
 
@@ -1169,7 +1190,6 @@ export default function MonitorACMeter() {
                 value={`${onlineMeters.length}/${config.meters.length}`}
                 unit=""
                 icon={<SensorsRounded />}
-                color={theme.palette.success.main}
                 subtitle="Current WebSocket readings"
               />
             </Box>
@@ -1177,12 +1197,12 @@ export default function MonitorACMeter() {
             {/* Meters panel */}
             <Card
               sx={{
+                ...studioSx.card,
                 minWidth: 0,
                 minHeight: { xs: 250, lg: 0 },
                 height: "100%",
                 display: "flex",
                 flexDirection: "column",
-                borderRadius: 2.5,
               }}
             >
               <CardContent
@@ -1213,8 +1233,11 @@ export default function MonitorACMeter() {
                     </Typography>
 
                     <Typography
-                      variant="caption"
-                      color="text.secondary"
+                      sx={{
+                        ...studioSx.secondaryText,
+                        fontFamily: tokens.mono,
+                        fontSize: "0.65rem",
+                      }}
                     >
                       {config.meters.length} configured
                     </Typography>
@@ -1222,24 +1245,12 @@ export default function MonitorACMeter() {
 
                   <Button
                     variant="contained"
-                    size="small"
                     startIcon={<AddRounded />}
                     onClick={openConfig}
                     sx={{
+                      ...toolbarButtonSx,
                       ml: "auto",
-                      flexShrink: 0,
                       minWidth: 112,
-                      minHeight: 38,
-                      height: 38,
-                      px: 1.75,
-                      py: 0.75,
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                      borderRadius: 2,
-                      whiteSpace: "nowrap",
-                      "& .MuiButton-startIcon": {
-                        mr: 0.75,
-                      },
                     }}
                   >
                     Add meter
@@ -1328,8 +1339,8 @@ export default function MonitorACMeter() {
                           mx: "auto",
                         }}
                       >
-                        Add a meter to start monitoring its live
-                        electrical readings.
+                        Add a meter to start monitoring its live electrical
+                        readings.
                       </Typography>
                     </Box>
                   </Box>
@@ -1339,7 +1350,7 @@ export default function MonitorACMeter() {
           </Box>
 
           {/* Power trend */}
-          <Card sx={{ borderRadius: 2.5 }}>
+          <Card sx={studioSx.card}>
             <CardContent
               sx={{
                 p: 2,
@@ -1356,14 +1367,9 @@ export default function MonitorACMeter() {
                 }}
               >
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography fontWeight={700}>
-                    Total Power Trend
-                  </Typography>
+                  <Typography fontWeight={700}>Total Power Trend</Typography>
 
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
+                  <Typography sx={studioSx.secondaryText}>
                     Combined power reported by online meters
                   </Typography>
                 </Box>
@@ -1383,10 +1389,7 @@ export default function MonitorACMeter() {
                   inputProps={{ "aria-label": "Time window" }}
                 >
                   {WINDOW_OPTIONS.map((option) => (
-                    <MenuItem
-                      key={option.value}
-                      value={option.value}
-                    >
+                    <MenuItem key={option.value} value={option.value}>
                       {option.label}
                     </MenuItem>
                   ))}
@@ -1440,10 +1443,7 @@ export default function MonitorACMeter() {
                               : "Connecting to live meter service…"}
                       </Typography>
 
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                      >
+                      <Typography variant="body2" color="text.secondary">
                         {backendStatus === "checking"
                           ? "Checking whether the FastAPI service is reachable."
                           : backendStatus === "stopped"
@@ -1478,30 +1478,14 @@ export default function MonitorACMeter() {
               spacing={1.25}
               sx={{ mb: 1 }}
             >
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 2,
-                  bgcolor: "primary.main",
-                  color: "primary.contrastText",
-                  display: "grid",
-                  placeItems: "center",
-                  flexShrink: 0,
-                }}
-              >
+              <Box sx={{ ...studioSx.iconTile, width: 40, height: 40 }}>
                 <ElectricMeterRounded />
               </Box>
 
               <Box sx={{ minWidth: 0 }}>
-                <Typography fontWeight={700}>
-                  Configure your meters
-                </Typography>
+                <Typography fontWeight={700}>Configure your meters</Typography>
 
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                >
+                <Typography variant="body2" color="text.secondary">
                   Add, edit, or remove Modbus meters.
                 </Typography>
               </Box>
@@ -1520,14 +1504,9 @@ export default function MonitorACMeter() {
             }}
           >
             <Box sx={{ minWidth: 0 }}>
-              <Typography fontWeight={700}>
-                Configured meters
-              </Typography>
+              <Typography fontWeight={700}>Configured meters</Typography>
 
-              <Typography
-                variant="caption"
-                color="text.secondary"
-              >
+              <Typography sx={studioSx.secondaryText}>
                 Slave IDs must be unique and between 1 and 247.
               </Typography>
             </Box>
@@ -1546,7 +1525,7 @@ export default function MonitorACMeter() {
                   key={`${index}-${meter.meter_name}`}
                   variant="outlined"
                   sx={{
-                    borderRadius: 2,
+                    borderRadius: "10px",
                     boxShadow: "none",
                   }}
                 >
@@ -1556,11 +1535,7 @@ export default function MonitorACMeter() {
                       "&:last-child": { pb: 1.5 },
                     }}
                   >
-                    <Stack
-                      direction="row"
-                      alignItems="flex-start"
-                      spacing={1}
-                    >
+                    <Stack direction="row" alignItems="flex-start" spacing={1}>
                       <Box
                         sx={{
                           width: 34,
@@ -1596,11 +1571,7 @@ export default function MonitorACMeter() {
                           label="Meter name"
                           value={meter.meter_name}
                           onChange={(event) =>
-                            updateMeter(
-                              index,
-                              "meter_name",
-                              event.target.value
-                            )
+                            updateMeter(index, "meter_name", event.target.value)
                           }
                         />
 
@@ -1611,11 +1582,7 @@ export default function MonitorACMeter() {
                           label="Slave ID"
                           value={meter.slave_id ?? ""}
                           onChange={(event) =>
-                            updateMeter(
-                              index,
-                              "slave_id",
-                              event.target.value
-                            )
+                            updateMeter(index, "slave_id", event.target.value)
                           }
                           slotProps={{
                             htmlInput: {
@@ -1633,9 +1600,7 @@ export default function MonitorACMeter() {
                             size="small"
                             color="error"
                             onClick={() => removeMeter(index)}
-                            disabled={
-                              saving || config.meters.length <= 1
-                            }
+                            disabled={saving || config.meters.length <= 1}
                             aria-label={`Remove ${meter.meter_name}`}
                             sx={{ mt: 0.25 }}
                           >
@@ -1657,7 +1622,7 @@ export default function MonitorACMeter() {
                 border: 1,
                 borderStyle: "dashed",
                 borderColor: "divider",
-                borderRadius: 2,
+                borderRadius: "10px",
               }}
             >
               <SensorsRounded
@@ -1668,9 +1633,7 @@ export default function MonitorACMeter() {
                 }}
               />
 
-              <Typography fontWeight={700}>
-                No meters configured
-              </Typography>
+              <Typography fontWeight={700}>No meters configured</Typography>
 
               <Typography
                 variant="body2"
