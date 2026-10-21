@@ -65,10 +65,23 @@ function Run-Python {
         [string[]]$Arguments
     )
 
-    & $Python @Arguments
+    # Capture pip/Python output instead of displaying it in the installer.
+    $output = & $Python @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Python command failed with exit code $LASTEXITCODE."
+    if ($exitCode -ne 0) {
+        # Show diagnostic output only if the operation fails.
+        $details = ($output | Out-String).Trim()
+
+        if ($details.Length -gt 1500) {
+            $details = $details.Substring(0, 1500)
+        }
+
+        if ($details) {
+            throw "A setup operation failed (exit code $exitCode). $details"
+        }
+
+        throw "A setup operation failed (exit code $exitCode)."
     }
 }
 
