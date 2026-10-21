@@ -1,4 +1,3 @@
-
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -20,6 +19,7 @@ import {
   MenuItem,
   Paper,
   Stack,
+  Switch,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -34,8 +34,9 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import AddNewWindow from "./AddNewWindow";
 import { useSocket } from "../../context/SocketContext";
 import EditWindow from "./EditWindow";
+import { invoke } from "@tauri-apps/api/core";
 
-const API_URL = "http://192.168.1.23:8000/screens/windows/";
+const API_URL = "http://192.168.1.23:8000/screens/windows/?role=admin";
 
 const COLORS = {
   primary: "#064E3B",
@@ -47,71 +48,23 @@ const COLORS = {
   success: "#059669",
 };
 
-/*
- * Responsive typography.
- * Font size changes with viewport width, not the page layout.
- */
 const FONT = {
-  pageTitle: {
-    xs: "12px",
-    sm: "13px",
-    md: "14px",
-    lg: "15px",
-    xl: "16px",
-  },
-  cardTitle: {
-    xs: "9px",
-    sm: "9.5px",
-    md: "10px",
-    lg: "10.5px",
-    xl: "11px",
-  },
-  body: {
-    xs: "8px",
-    sm: "8.5px",
-    md: "9px",
-    lg: "9.5px",
-    xl: "10px",
-  },
-  button: {
-    xs: "8px",
-    sm: "8.5px",
-    md: "9px",
-    lg: "9.5px",
-    xl: "10px",
-  },
-  caption: {
-    xs: "7px",
-    sm: "7.5px",
-    md: "8px",
-    lg: "8.5px",
-    xl: "9px",
-  },
-  dialogTitle: {
-    xs: "13px",
-    sm: "14px",
-    md: "15px",
-    lg: "15px",
-    xl: "16px",
-  },
-  dialogBody: {
-    xs: "10px",
-    sm: "10.5px",
-    md: "11px",
-    lg: "11.5px",
-    xl: "12px",
-  },
+  pageTitle: { xs: "12px", sm: "13px", md: "14px", lg: "15px", xl: "16px" },
+  cardTitle: { xs: "9px", sm: "9.5px", md: "10px", lg: "10.5px", xl: "11px" },
+  body: { xs: "8px", sm: "8.5px", md: "9px", lg: "9.5px", xl: "10px" },
+  button: { xs: "8px", sm: "8.5px", md: "9px", lg: "9.5px", xl: "10px" },
+  caption: { xs: "7px", sm: "7.5px", md: "8px", lg: "8.5px", xl: "9px" },
+  dialogTitle: { xs: "13px", sm: "14px", md: "15px", lg: "15px", xl: "16px" },
+  dialogBody: { xs: "10px", sm: "10.5px", md: "11px", lg: "11.5px", xl: "12px" },
 };
 
 const getValue = (object, keys, fallback = "") => {
   for (const key of keys) {
     const value = object?.[key];
-
     if (value !== undefined && value !== null && value !== "") {
       return value;
     }
   }
-
   return fallback;
 };
 
@@ -121,11 +74,12 @@ const getWindowName = (window, index) =>
 const getScreenName = (window) =>
   getValue(
     window,
-    ["screen_name", "assigned_screen_name", "screen_title"],
-    "Unassigned screen"
+    ["screen_name", "assigned_screen_name", "screen_title", "active_screen_details.name"],
+    window?.active_screen_details?.name || "Unassigned screen"
   );
 
 const getScreenPath = (window) =>
+  window?.active_screen_details?.path ||
   getValue(window, ["screen_path", "assigned_screen_path", "path"], "");
 
 const getPort = (window) =>
@@ -136,38 +90,27 @@ const getPort = (window) =>
   );
 
 const formatResolution = (window) => {
-  const resolution = getValue(window, [
-    "resolution",
-    "display_resolution",
-    "screen_resolution",
-  ]);
+  const pos = window?.position_details;
+  if (pos?.width && pos?.height) return `${pos.width} × ${pos.height}`;
 
+  const resolution = getValue(window, ["resolution", "display_resolution", "screen_resolution"]);
   if (resolution) return String(resolution);
 
-  const width = getValue(window, [
-    "width",
-    "screen_width",
-    "resolution_width",
-  ]);
-
-  const height = getValue(window, [
-    "height",
-    "screen_height",
-    "resolution_height",
-  ]);
-
+  const width = getValue(window, ["width", "screen_width", "resolution_width"]);
+  const height = getValue(window, ["height", "screen_height", "resolution_height"]);
   if (width && height) return `${width} × ${height}`;
 
   return "Resolution unavailable";
 };
 
+// ✅ is_active added as first priority
 const isOnline = (window) => {
-  const status = getValue(window, ["status", "connection_status"], "");
-
+  if (typeof window?.is_active === "boolean") return window.is_active;
   if (typeof window?.is_online === "boolean") return window.is_online;
   if (typeof window?.online === "boolean") return window.online;
   if (typeof window?.is_connected === "boolean") return window.is_connected;
 
+  const status = getValue(window, ["status", "connection_status"], "");
   if (typeof status === "string") {
     return ["online", "connected", "active"].includes(status.toLowerCase());
   }
@@ -179,15 +122,11 @@ const getWindowType = (window) =>
   getValue(window, ["display_type", "window_type", "type", "mode"], "DISPLAY");
 
 const getScreens = (window) => {
-  const screens = getValue(window, [
-    "available_screens",
-    "screens",
-    "screen_options",
-  ]);
-
+  const screens = getValue(window, ["available_screens", "screens", "screen_options"]);
   return Array.isArray(screens) ? screens : [];
 };
 
+// ─── WindowCard ───────────────────────────────────────────────────────────────
 
 
 function WindowCard({
@@ -197,6 +136,7 @@ function WindowCard({
   onFocus,
   onConfigure,
   onDetach,
+  onToggleOnline,
 }) {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [focused, setFocused] = useState(false);
@@ -207,18 +147,22 @@ function WindowCard({
   const online = isOnline(window);
   const port = getPort(window);
   const resolution = formatResolution(window);
-  const type = String(getWindowType(window)).toUpperCase();
   const screenOptions = getScreens(window);
 
   return (
     <Card
       elevation={0}
       sx={{
-        width: "100%",
-        height: "100%",
-        minWidth: 0,
+        width: 200,
+        height: 155,
+        minWidth: 250,
+        maxWidth: 300,
         boxSizing: "border-box",
-        border: `1px solid ${focused ? "#86DCC0" : COLORS.border}`,
+        display: "flex",
+        flexDirection: "column",
+        border: `1px solid ${
+          focused ? "#86DCC0" : COLORS.border
+        }`,
         borderRadius: "10px",
         bgcolor: "#FFFFFF",
         overflow: "visible",
@@ -231,10 +175,16 @@ function WindowCard({
     >
       <CardContent
         sx={{
-          p: { xs: 1, sm: 1.15, md: 1.25, lg: 1.35 },
-          "&:last-child": {
-            pb: { xs: 1, md: 1.2 },
-          },
+          p: 1.25,
+          "&:last-child": { pb: 1.25 },
+          width: "100%",
+          height: "100%",
+          minHeight: 0,
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          overflow: "hidden",
         }}
       >
         {/* Window heading */}
@@ -244,7 +194,6 @@ function WindowCard({
             alignItems: "center",
             justifyContent: "space-between",
             gap: 0.75,
-            mb: 0.7,
             minWidth: 0,
           }}
         >
@@ -285,35 +234,51 @@ function WindowCard({
             </Typography>
           </Stack>
 
-          <Stack
-            direction="row"
-            sx={{
-              alignItems: "center",
-              gap: 0.4,
-              flexShrink: 0,
-            }}
+          <Tooltip
+            title={online ? "Window is online" : "Window is offline"}
           >
-
-            <Chip
+            <Switch
               size="small"
-              label={type}
+              checked={Boolean(online)}
+              onChange={(event) => {
+                onToggleOnline?.(
+                  window,
+                  index,
+                  event.target.checked
+                );
+              }}
+              inputProps={{
+                "aria-label": `Toggle ${name} online status`,
+              }}
               sx={{
-                maxWidth: 78,
-                height: { xs: 17, md: 19, xl: 20 },
-                borderRadius: "4px",
-                bgcolor: "#F1F5F9",
-                border: "1px solid #E2E8F0",
-                color: "#475569",
-                fontSize: FONT.caption,
-                fontWeight: 700,
-                "& .MuiChip-label": {
-                  px: 0.6,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
+                width: 36,
+                height: 22,
+                p: 0,
+                flexShrink: 0,
+                "& .MuiSwitch-switchBase": {
+                  p: "3px",
+                  "&.Mui-checked": {
+                    transform: "translateX(14px)",
+                    color: "#FFFFFF",
+                    "& + .MuiSwitch-track": {
+                      bgcolor: "#047857",
+                      opacity: 1,
+                    },
+                  },
+                },
+                "& .MuiSwitch-thumb": {
+                  width: 16,
+                  height: 16,
+                  boxShadow: "0 1px 3px rgba(15,23,42,0.2)",
+                },
+                "& .MuiSwitch-track": {
+                  borderRadius: 11,
+                  bgcolor: "#CBD5E1",
+                  opacity: 1,
                 },
               }}
             />
-          </Stack>
+          </Tooltip>
         </Stack>
 
         {/* Hardware output details */}
@@ -323,14 +288,16 @@ function WindowCard({
             fontSize: FONT.body,
             color: "#8390A6",
             pl: 1.7,
-            mb: 1.1,
+            minWidth: 0,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}
         >
           {`${port} • ${resolution}`}
-          {window?.refresh_rate ? ` @ ${window.refresh_rate}Hz` : ""}
+          {window?.refresh_rate
+            ? ` @ ${window.refresh_rate}Hz`
+            : ""}
         </Typography>
 
         {/* Assigned screen */}
@@ -339,19 +306,20 @@ function WindowCard({
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: 0.9,
+            gap: 0.75,
             minWidth: 0,
-            p: { xs: 0.6, md: 0.75 },
+            p: 0.65,
             borderRadius: "7px",
             borderColor: "#E8EDF4",
             bgcolor: "#FBFCFE",
+            boxSizing: "border-box",
           }}
         >
           <Avatar
             variant="rounded"
             sx={{
-              width: { xs: 20, md: 23 },
-              height: { xs: 20, md: 23 },
+              width: 23,
+              height: 23,
               bgcolor: "#071D1A",
               color: "#FFFFFF",
               fontSize: FONT.caption,
@@ -361,13 +329,17 @@ function WindowCard({
             }}
           >
             {String(
-              getValue(window, ["screen_code", "screen_short_name"], "LIVE")
+              getValue(
+                window,
+                ["screen_code", "screen_short_name"],
+                "LIVE"
+              )
             )
               .slice(0, 5)
               .toUpperCase()}
           </Avatar>
 
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
             <Typography
               title={screenName}
               sx={{
@@ -377,6 +349,7 @@ function WindowCard({
                 overflow: "hidden",
                 whiteSpace: "nowrap",
                 textOverflow: "ellipsis",
+                lineHeight: 1.35,
               }}
             >
               {screenName}
@@ -403,7 +376,7 @@ function WindowCard({
             endIcon={
               screenOptions.length > 0 ? (
                 <KeyboardArrowDownRoundedIcon
-                  sx={{ fontSize: { xs: 11, md: 14 } }}
+                  sx={{ fontSize: 14 }}
                 />
               ) : null
             }
@@ -417,8 +390,8 @@ function WindowCard({
             sx={{
               flexShrink: 0,
               minWidth: 0,
-              px: { xs: 0.5, md: 0.8 },
-              py: 0.45,
+              px: 0.7,
+              py: 0.4,
               borderRadius: "5px",
               borderColor: "#E2E8F0",
               color: "#334155",
@@ -437,7 +410,7 @@ function WindowCard({
               },
             }}
           >
-            Change Screen
+            Change
           </Button>
 
           <Menu
@@ -453,6 +426,7 @@ function WindowCard({
                   borderRadius: "9px",
                   border: `1px solid ${COLORS.border}`,
                   boxShadow: "0 12px 35px rgba(15,23,42,0.12)",
+                  zIndex: 99999,
                 },
               },
             }}
@@ -483,7 +457,11 @@ function WindowCard({
                 <MenuItem
                   key={String(
                     typeof screen === "object"
-                      ? getValue(screen, ["id", "pk", "path"], label)
+                      ? getValue(
+                          screen,
+                          ["id", "pk", "path"],
+                          label
+                        )
                       : label
                   )}
                   onClick={() => {
@@ -516,28 +494,27 @@ function WindowCard({
             alignItems: "center",
             justifyContent: "space-between",
             gap: 0.5,
-            mt: 1.05,
+            minWidth: 0,
           }}
         >
-          <Stack direction="row" sx={{ gap: { xs: 0.8, md: 1.2 } }}>
-           
-
-            <Button
-              size="small"
-              onClick={() => onConfigure(window, index)}
-              startIcon={<SettingsOutlinedIcon sx={{ fontSize: 12 }} />}
-              sx={{
-                p: 0,
-                minWidth: 0,
-                color: "#64748B",
-                fontSize: FONT.button,
-                textTransform: "none",
-                "& .MuiButton-startIcon": { mr: 0.4 },
-              }}
-            >
-             Edit Config
-            </Button>
-          </Stack>
+          <Button
+            size="small"
+            onClick={() => onConfigure(window, index)}
+            startIcon={
+              <SettingsOutlinedIcon sx={{ fontSize: 12 }} />
+            }
+            sx={{
+              p: 0,
+              minWidth: 0,
+              color: "#64748B",
+              fontSize: FONT.button,
+              textTransform: "none",
+              whiteSpace: "nowrap",
+              "& .MuiButton-startIcon": { mr: 0.4 },
+            }}
+          >
+            Edit Config
+          </Button>
 
           <Button
             size="small"
@@ -549,11 +526,12 @@ function WindowCard({
               color: "#64748B",
               fontSize: FONT.button,
               textTransform: "none",
+              whiteSpace: "nowrap",
               "& .MuiButton-startIcon": { mr: 0.3 },
               "&:hover": { color: "#DC2626" },
             }}
           >
-            Detach
+            Delete
           </Button>
         </Stack>
       </CardContent>
@@ -561,26 +539,28 @@ function WindowCard({
   );
 }
 
+
+// ─── ScreenWindows ────────────────────────────────────────────────────────────
+
 function ScreenWindows() {
   const [windows, setWindows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const {send} = useSocket()
-  const [window,setWindow] = useState(null)
+  const { send } = useSocket();
+  const [selectedWindowData, setSelectedWindowData] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [selectedWindow, setSelectedWindow] = useState(null);
-  const [openAddNewWindow,setOpenAddNewWindow]=useState(false)
-  const [editWindow,setEditWindow] = useState(false)
+  const [openAddNewWindow, setOpenAddNewWindow] = useState(false);
+  const [editWindow, setEditWindow] = useState(false);
   const [notice, setNotice] = useState("");
-  const [lastScreen,setLastScreen] = useState(null)
+
   const fetchWindows = useCallback(async ({ silent = false } = {}) => {
     if (silent) {
       setRefreshing(true);
     } else {
       setLoading(true);
     }
-
     setError("");
 
     try {
@@ -593,7 +573,6 @@ function ScreenWindows() {
       }
 
       const data = await response.json();
-
       const result = Array.isArray(data)
         ? data
         : data?.results ?? data?.windows ?? data?.data;
@@ -619,56 +598,61 @@ function ScreenWindows() {
     fetchWindows();
   }, [fetchWindows]);
 
-  const handleOnWindowCreated = useCallback((data) => {
-  if (!data?.id) return;
-
-  setWindows((prev) =>
-    prev.some(({ id }) => id === data.id)
-      ? prev
-      : [...prev, data]
+  const handleOnWindowCreated = useCallback(
+   async (data) => {
+      if (!data?.id) return;
+      setWindows((prev) =>
+        prev.some(({ id }) => id === data.id) ? prev : [...prev, data]
+      );
+      const running = await invoke('is_electron_running')
+      console.log("is receiver is running",running)
+      if(running){
+        send({ type: "create_window", data });
+      }
+    },
+    [send]
   );
-  send({
-    "type":"create_window",
-    "data":data
-  })
-}, []);
 
   const onlineCount = useMemo(
-    () => windows.filter((window) => isOnline(window)).length,
+    () => windows.filter((w) => isOnline(w)).length,
     [windows]
   );
 
-  const openAction = (type, window, index, screen = null) => {
-    setSelectedWindow({ window, index, screen });
-    setDialogType(type);
-  };
-
-  const closeDialog = () => {
-    setDialogType("");
-    setSelectedWindow(null);
-  };
-
-  const currentName = selectedWindow
-    ? getWindowName(selectedWindow.window, selectedWindow.index)
-    : "";
-
   const handleChangeScreen = (window, index, screen = null) => {
-    openAction("screen", window, index, screen);
-
+    setSelectedWindow({ window, index, screen });
     if (screen) {
       setNotice(
         "Screen selected locally. Connect your screen-assignment API to save this change on the backend."
       );
     }
   };
-    const handleSelectWindow = useCallback((i,index)=>{
-    console.log("------i & item",i)
-    setEditWindow(true)
-    setWindow(i)
-  },[])
 
+  const handleSelectWindow = useCallback((item) => {
+    setEditWindow(true);
+    setSelectedWindowData(item);
+  }, []);
 
+  // ✅ Updates is_active in local state and sends via socket
+  const handleIsOnline = useCallback(
+   async (item, index, newOnlineStatus) => {
+      setWindows((prev) =>
+        prev.map((w, i) =>
+          i === index ? { ...w, is_active: newOnlineStatus } : w
+        )
+      );
 
+      send({
+        type: "toggle_online",
+        data: {
+          id: item.id,
+          index,
+          is_active: newOnlineStatus,
+          is_app_on:await invoke("is_electron_running")
+        },
+      });
+    },
+    [send]
+  );
 
   return (
     <Box
@@ -707,15 +691,7 @@ function ScreenWindows() {
             gap: 1.5,
           }}
         >
-          <Stack
-            direction="row"
-            sx={{
-              alignItems: "center",
-              gap: 1,
-              minWidth: 0,
-              flex: 1,
-            }}
-          >
+          <Stack direction="row" sx={{ alignItems: "center", gap: 1, minWidth: 0, flex: 1 }}>
             <Avatar
               variant="rounded"
               sx={{
@@ -728,9 +704,7 @@ function ScreenWindows() {
                 flexShrink: 0,
               }}
             >
-              <WindowOutlinedIcon
-                sx={{ fontSize: { xs: 16, md: 20 } }}
-              />
+              <WindowOutlinedIcon sx={{ fontSize: { xs: 16, md: 20 } }} />
             </Avatar>
 
             <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -746,23 +720,10 @@ function ScreenWindows() {
                 Active Display Windows &amp; Hardware Output Mapping
               </Typography>
 
-              <Stack
-                direction="row"
-                sx={{
-                  alignItems: "center",
-                  gap: 0.8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <Typography
-                  sx={{
-                    color: COLORS.muted,
-                    fontSize: FONT.body,
-                  }}
-                >
+              <Stack direction="row" sx={{ alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+                <Typography sx={{ color: COLORS.muted, fontSize: FONT.body }}>
                   Live hardware monitors, projection ports, and multi-display setups
                 </Typography>
-
                 <Chip
                   size="small"
                   label={`${onlineCount} online outputs (Max ${windows.length})`}
@@ -782,12 +743,7 @@ function ScreenWindows() {
 
           <Stack
             direction="row"
-            sx={{
-              alignItems: "center",
-              gap: 0.8,
-              justifyContent: "flex-end",
-              flexShrink: 0,
-            }}
+            sx={{ alignItems: "center", gap: 0.8, justifyContent: "flex-end", flexShrink: 0 }}
           >
             <Button
               variant="outlined"
@@ -811,10 +767,7 @@ function ScreenWindows() {
                 fontWeight: 750,
                 textTransform: "none",
                 whiteSpace: "nowrap",
-                "&:hover": {
-                  bgcolor: "#ECFDF5",
-                  borderColor: COLORS.primaryLight,
-                },
+                "&:hover": { bgcolor: "#ECFDF5", borderColor: COLORS.primaryLight },
               }}
             >
               Refresh Outputs
@@ -835,10 +788,7 @@ function ScreenWindows() {
                 textTransform: "none",
                 whiteSpace: "nowrap",
                 boxShadow: "none",
-                "&:hover": {
-                  bgcolor: COLORS.primaryLight,
-                  boxShadow: "none",
-                },
+                "&:hover": { bgcolor: COLORS.primaryLight, boxShadow: "none" },
               }}
             >
               Add New Window
@@ -847,13 +797,7 @@ function ScreenWindows() {
         </Stack>
 
         {lastUpdated && (
-          <Typography
-            sx={{
-              mt: 0.8,
-              color: "#94A3B8",
-              fontSize: FONT.caption,
-            }}
-          >
+          <Typography sx={{ mt: 0.8, color: "#94A3B8", fontSize: FONT.caption }}>
             Last updated: {lastUpdated.toLocaleTimeString()}
           </Typography>
         )}
@@ -892,12 +836,7 @@ function ScreenWindows() {
         <Alert
           severity="info"
           onClose={() => setNotice("")}
-          sx={{
-            width: "100%",
-            mb: 1.5,
-            borderRadius: "8px",
-            fontSize: FONT.body,
-          }}
+          sx={{ width: "100%", mb: 1.5, borderRadius: "8px", fontSize: FONT.body }}
         >
           {notice}
         </Alert>
@@ -916,16 +855,8 @@ function ScreenWindows() {
             gap: 1.5,
           }}
         >
-          <CircularProgress
-            size={30}
-            sx={{ color: COLORS.primaryLight }}
-          />
-          <Typography
-            sx={{
-              color: COLORS.muted,
-              fontSize: FONT.body,
-            }}
-          >
+          <CircularProgress size={30} sx={{ color: COLORS.primaryLight }} />
+          <Typography sx={{ color: COLORS.muted, fontSize: FONT.body }}>
             Loading display outputs...
           </Typography>
         </Box>
@@ -945,38 +876,17 @@ function ScreenWindows() {
             borderRadius: "12px",
           }}
         >
-          <MonitorOutlinedIcon
-            sx={{ fontSize: 38, color: "#94A3B8", mb: 1 }}
-          />
-
-          <Typography
-            sx={{
-              fontWeight: 750,
-              color: COLORS.text,
-              fontSize: FONT.pageTitle,
-            }}
-          >
+          <MonitorOutlinedIcon sx={{ fontSize: 38, color: "#94A3B8", mb: 1 }} />
+          <Typography sx={{ fontWeight: 750, color: COLORS.text, fontSize: FONT.pageTitle }}>
             No display windows found
           </Typography>
-
-          <Typography
-            sx={{
-              color: COLORS.muted,
-              fontSize: FONT.body,
-              mt: 0.5,
-            }}
-          >
+          <Typography sx={{ color: COLORS.muted, fontSize: FONT.body, mt: 0.5 }}>
             Connect a display output or refresh the API response.
           </Typography>
-
           <Button
             onClick={() => fetchWindows()}
             startIcon={<RefreshIcon />}
-            sx={{
-              mt: 1.5,
-              textTransform: "none",
-              fontSize: FONT.button,
-            }}
+            sx={{ mt: 1.5, textTransform: "none", fontSize: FONT.button }}
           >
             Refresh windows
           </Button>
@@ -988,21 +898,12 @@ function ScreenWindows() {
         <Grid
           container
           spacing={{ xs: 1, md: 1.5 }}
-          sx={{
-            width: "100%",
-            maxWidth: "none",
-            minWidth: 0,
-            m: 0,
-          }}
+          sx={{ width: "100%", maxWidth: "none", minWidth: 0, m: 0 }}
         >
           {windows.map((window, index) => (
             <Grid
               item
-              key={getValue(
-                window,
-                ["id", "pk", "window_id"],
-                `window-${index}`
-              )}
+              key={getValue(window, ["id", "pk", "window_id"], `window-${index}`)}
               xs={12}
               sm={6}
               md={4}
@@ -1014,27 +915,29 @@ function ScreenWindows() {
                 window={window}
                 index={index}
                 onChangeScreen={handleChangeScreen}
-                onFocus={(item, i) => openAction("focus", item, i)}
-                onConfigure={(item, i) => handleSelectWindow(item,i)}
-                onDetach={(item, i) => openAction("detach", item, i)}
+                onFocus={(item, i) => setSelectedWindow({ window: item, index: i })}
+                onConfigure={(item) => handleSelectWindow(item)}
+                onDetach={(item, i) => setSelectedWindow({ window: item, index: i })}
+                onToggleOnline={handleIsOnline}
               />
             </Grid>
           ))}
         </Grid>
       )}
 
-      {
-        openAddNewWindow && (
-          <AddNewWindow onClose={()=>setOpenAddNewWindow(false)} onCreated={handleOnWindowCreated} />
-        )
-      }
-      {
-        editWindow && (
-          <EditWindow onClose={()=>setEditWindow(false)} selectedWindow={window}/>
-        )
-      }
+      {openAddNewWindow && (
+        <AddNewWindow
+          onClose={() => setOpenAddNewWindow(false)}
+          onCreated={handleOnWindowCreated}
+        />
+      )}
 
-
+      {editWindow && (
+        <EditWindow
+          onClose={() => setEditWindow(false)}
+          selectedWindow={selectedWindowData}
+        />
+      )}
     </Box>
   );
 }
