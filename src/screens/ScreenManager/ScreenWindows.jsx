@@ -35,8 +35,9 @@ import AddNewWindow from "./AddNewWindow";
 import { useSocket } from "../../context/SocketContext";
 import EditWindow from "./EditWindow";
 import { invoke } from "@tauri-apps/api/core";
+import api from "../../config.json";
 
-const API_URL = "http://192.168.1.23:8000/screens/windows/?role=admin";
+const API_URL = `${api.apiBase}/screens/windows/?role=admin`;
 
 const COLORS = {
   primary: "#064E3B",

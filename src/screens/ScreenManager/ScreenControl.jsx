@@ -1,3 +1,4 @@
+
 import React, {
   useCallback,
   useEffect,
@@ -27,9 +28,6 @@ import api from "../../config.json";
 import { useSocket } from "../../context/SocketContext";
 
 const SCREEN_API_URL = `${api.apiBase}/screens/screen-position/`;
-// Adjust this to wherever your backend exposes the list of monitors
-// and the LED UI resolution currently running on each of them.
-const MONITORS_API_URL = `${api.apiBase}/screens/monitors-led-status/`;
 
 const initialSettings = {
   width: "1080",
@@ -72,8 +70,8 @@ function ScreenControl() {
   } = useSocket();
 
   const [screen, setScreen] = useState(null);
-  const [settings, setSettings] = useState(initialSettings);
-  const [baseline, setBaseline] = useState(initialSettings);
+  const [settings, setSettings] = useState({ ...initialSettings });
+  const [baseline, setBaseline] = useState({ ...initialSettings });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,10 +79,6 @@ function ScreenControl() {
 
   const [receiverOn, setReceiverOn] = useState(false);
   const [receiverToggling, setReceiverToggling] = useState(false);
-
-  // Monitors + LED UI usage per monitor.
-  const [monitors, setMonitors] = useState([]);
-  const [monitorsLoading, setMonitorsLoading] = useState(true);
 
   // Load the current screen configuration.
   useEffect(() => {
@@ -116,10 +110,15 @@ function ScreenControl() {
         console.error("Could not load screen settings:", error);
 
         if (active) {
-       
+          setFeedback({
+            type: "error",
+            message: "Could not load screen settings.",
+          });
         }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
@@ -166,50 +165,6 @@ function ScreenControl() {
       active = false;
     };
   }, []);
-
-  // Load monitors + per-monitor LED UI resolution usage.
-  const loadMonitors = useCallback(async () => {
-    setMonitorsLoading(true);
-
-    try {
-      // Prefer live data from Electron if available (actual connected
-      // displays), falling back to the backend endpoint.
-      let monitorList = [];
-
-      if (window.electronAPI?.getMonitorsLedStatus) {
-        const result = await window.electronAPI.getMonitorsLedStatus();
-        monitorList = Array.isArray(result) ? result : [];
-      } else {
-        const response = await fetch(MONITORS_API_URL);
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to load monitors (${response.status}).`
-          );
-        }
-
-        const data = await response.json();
-        monitorList = Array.isArray(data) ? data : data?.monitors || [];
-      }
-
-      setMonitors(monitorList);
-    } catch (error) {
-      console.error("Could not load monitors LED status:", error);
-      setMonitors([]);
-    } finally {
-      setMonitorsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadMonitors();
-  }, [loadMonitors]);
-
-  // Re-fetch monitor usage whenever the LED UI is toggled, so the
-  // "used vs free resolution" numbers stay accurate.
-  useEffect(() => {
-    loadMonitors();
-  }, [receiverOn, loadMonitors]);
 
   const updateSetting = useCallback((key, value) => {
     setSettings((previous) => ({
@@ -259,7 +214,10 @@ function ScreenControl() {
     if (!hasChanges) return;
 
     if (!connected) {
-   
+      setFeedback({
+        type: "error",
+        message: "WebSocket is disconnected. Please reconnect and try again.",
+      });
       return;
     }
 
@@ -270,7 +228,10 @@ function ScreenControl() {
       Number(settings.height) <= 0;
 
     if (invalidDimension) {
-     
+      setFeedback({
+        type: "error",
+        message: "Width and height must be positive integers.",
+      });
       return;
     }
 
@@ -281,7 +242,10 @@ function ScreenControl() {
       !Number.isFinite(Number(settings.positionY));
 
     if (invalidPosition) {
-      
+      setFeedback({
+        type: "error",
+        message: "Position X and Position Y must be valid numbers.",
+      });
       return;
     }
 
@@ -297,11 +261,17 @@ function ScreenControl() {
 
       setBaseline({ ...settings });
 
-     
+      setFeedback({
+        type: "success",
+        message: "Screen settings sent successfully.",
+      });
     } catch (error) {
       console.error("Could not send screen settings:", error);
 
-     
+      setFeedback({
+        type: "error",
+        message: "Could not send screen settings.",
+      });
     } finally {
       setSaving(false);
     }
@@ -322,7 +292,10 @@ function ScreenControl() {
       !electronAPI?.startReceiver ||
       !electronAPI?.stopReceiver
     ) {
-  
+      setFeedback({
+        type: "error",
+        message: "LED UI receiver controls are unavailable.",
+      });
       return;
     }
 
@@ -336,7 +309,12 @@ function ScreenControl() {
 
       setReceiverOn(Boolean(result?.running ?? checked));
 
-   
+      setFeedback({
+        type: "success",
+        message: checked
+          ? "LED UI receiver started."
+          : "LED UI receiver stopped.",
+      });
     } catch (error) {
       console.error("Failed to toggle LED UI:", error);
 
@@ -347,7 +325,10 @@ function ScreenControl() {
         // Keep the last known receiver status.
       }
 
-  
+      setFeedback({
+        type: "error",
+        message: "Failed to change LED UI receiver status.",
+      });
     } finally {
       setReceiverToggling(false);
     }
@@ -438,37 +419,6 @@ function ScreenControl() {
     },
   };
 
-  // Helper: compute used vs free resolution/area for a monitor entry.
-  // Expects each monitor to look roughly like:
-  // { id, name, width, height, ledWidth, ledHeight }
-  const getMonitorUsage = (monitor) => {
-    const monitorWidth = Number(monitor.width) || 0;
-    const monitorHeight = Number(monitor.height) || 0;
-    const ledWidth = Number(monitor.ledWidth ?? monitor.led_width) || 0;
-    const ledHeight = Number(monitor.ledHeight ?? monitor.led_height) || 0;
-
-    const totalArea = monitorWidth * monitorHeight;
-    const usedArea = ledWidth * ledHeight;
-    const freeArea = Math.max(totalArea - usedArea, 0);
-
-    const freeWidth = Math.max(monitorWidth - ledWidth, 0);
-    const freeHeight = Math.max(monitorHeight - ledHeight, 0);
-
-    const usedPercent =
-      totalArea > 0 ? Math.round((usedArea / totalArea) * 100) : 0;
-
-    return {
-      monitorWidth,
-      monitorHeight,
-      ledWidth,
-      ledHeight,
-      freeWidth,
-      freeHeight,
-      usedPercent,
-      hasLed: ledWidth > 0 && ledHeight > 0,
-    };
-  };
-
   if (loading) {
     return (
       <Box
@@ -499,16 +449,16 @@ function ScreenControl() {
   }
 
   return (
-      <Box
-        sx={{
-          width: "100%",
-          maxWidth: 440,
-          mx: "auto",
-          p: 1.5,
-          boxSizing: "border-box",
-          fontFamily: "Inter, sans-serif",
-        }}
-      >
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: 440,
+        mx: "auto",
+        p: 1.5,
+        boxSizing: "border-box",
+        fontFamily: "Inter, sans-serif",
+      }}
+    >
       <Paper
         component="section"
         elevation={0}
@@ -558,7 +508,6 @@ function ScreenControl() {
             >
               Screen Resolution Control
             </Typography>
-
           </Box>
 
           <Chip
@@ -570,12 +519,8 @@ function ScreenControl() {
               fontSize: 10,
               fontWeight: 700,
               fontFamily: '"JetBrains Mono", monospace',
-              bgcolor: connected
-                ? "#ECFDF5"
-                : "action.hover",
-              color: connected
-                ? "#059669"
-                : "text.secondary",
+              bgcolor: connected ? "#ECFDF5" : "action.hover",
+              color: connected ? "#059669" : "text.secondary",
               border: "1px solid",
               borderColor: connected ? "#A7F3D0" : "divider",
             }}
@@ -595,8 +540,6 @@ function ScreenControl() {
             <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
               DIMENSIONS
             </Typography>
-
-            
           </Stack>
 
           <Stack direction="row" spacing={1}>
@@ -639,8 +582,6 @@ function ScreenControl() {
             <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
               POSITION
             </Typography>
-
-        
           </Stack>
 
           <Stack direction="row" spacing={1}>
@@ -670,7 +611,7 @@ function ScreenControl() {
           </Stack>
         </Box>
 
-        {/* Window behavior - single LED UI toggle */}
+        {/* Window behavior */}
         <Box sx={{ mb: 1.75 }}>
           <Typography sx={sectionTitleSx}>
             WINDOW BEHAVIOR
@@ -700,119 +641,7 @@ function ScreenControl() {
           </Box>
         </Box>
 
-        {/* LED UI usage per monitor */}
-        <Box sx={{ mb: 1.75 }}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ mb: 0.8 }}
-          >
-            <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
-              LED UI ON MONITORS
-            </Typography>
-
-            {monitorsLoading && <CircularProgress size={12} />}
-          </Stack>
-
-          {!monitorsLoading && monitors.length === 0 && (
-            <Typography
-              sx={{
-                fontSize: 11,
-                color: "text.disabled",
-              }}
-            >
-              No monitors detected.
-            </Typography>
-          )}
-
-          <Stack spacing={1}>
-            {monitors.map((monitor, index) => {
-              const usage = getMonitorUsage(monitor);
-              const key = monitor.id ?? monitor.name ?? index;
-
-              return (
-                <Box
-                  key={key}
-                  sx={{
-                    p: 1.1,
-                    borderRadius: "9px",
-                    border: "1px solid",
-                    borderColor: "divider",
-                    bgcolor: "background.paper",
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    sx={{ mb: 0.5 }}
-                  >
-                    <Typography
-                      sx={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "text.primary",
-                      }}
-                    >
-                      {monitor.name || `Monitor ${index + 1}`}
-                    </Typography>
-
-                    <Chip
-                      size="small"
-                      label={usage.hasLed ? "LED ACTIVE" : "NO LED"}
-                      sx={{
-                        height: 18,
-                        fontSize: 9,
-                        fontWeight: 700,
-                        fontFamily: '"JetBrains Mono", monospace',
-                        bgcolor: usage.hasLed ? "#ECFDF5" : "action.hover",
-                        color: usage.hasLed ? "#059669" : "text.secondary",
-                        border: "1px solid",
-                        borderColor: usage.hasLed ? "#A7F3D0" : "divider",
-                      }}
-                    />
-                  </Stack>
-
-                  <Typography
-                    sx={{
-                      fontSize: 10,
-                      fontFamily: '"JetBrains Mono", monospace',
-                      color: "text.secondary",
-                    }}
-                  >
-                    Monitor: {usage.monitorWidth}×{usage.monitorHeight}
-                  </Typography>
-
-                  <Typography
-                    sx={{
-                      fontSize: 10,
-                      fontFamily: '"JetBrains Mono", monospace',
-                      color: "text.secondary",
-                    }}
-                  >
-                    LED UI: {usage.hasLed
-                      ? `${usage.ledWidth}×${usage.ledHeight}`
-                      : "—"}
-                  </Typography>
-
-                  <Typography
-                    sx={{
-                      fontSize: 10,
-                      fontFamily: '"JetBrains Mono", monospace',
-                      color: "text.secondary",
-                    }}
-                  >
-                    Free space: {usage.freeWidth}×{usage.freeHeight}
-                    {" "}
-                    ({usage.usedPercent}% used)
-                  </Typography>
-                </Box>
-              );
-            })}
-          </Stack>
-        </Box>
-
+        {/* Feedback */}
         {feedback && (
           <Alert
             severity={feedback.type}
@@ -832,7 +661,6 @@ function ScreenControl() {
         )}
 
         {/* Footer actions */}
-
         <Stack
           direction="row"
           alignItems="center"
