@@ -1,5 +1,71 @@
 import { createTheme } from "@mui/material/styles";
 
+
+
+// ---------------------------------------------------------------
+// Studio design tokens (shared with the CMS / App Theme page)
+// ---------------------------------------------------------------
+export const tokens = {
+  ink: "#0A0F1C",
+  lineLight: "#E3E8F0",
+  textLightSecondary: "#5B6472",
+  brand: "#064E3B",
+  brandHover: "#043D2E",
+  brandSoft: "#D1FAE5",
+  brandAccent: "#10B981",
+  border: "#C9D3E0",
+  surface: "#F8FAFC",
+  signalDark: "#C97F00",
+  mono: "'JetBrains Mono', 'Roboto Mono', monospace",
+};
+
+// Reusable sx blocks
+export const studioSx = {
+  card: {
+    bgcolor: "#fff",
+    border: `1px solid ${tokens.border}`,
+    borderRadius: "10px",
+    boxShadow: "none",
+  },
+  cardTitle: {
+    fontWeight: 600,
+    fontSize: "0.78rem",
+    lineHeight: 1.25,
+    color: tokens.ink,
+  },
+  monoLabel: {
+    fontFamily: tokens.mono,
+    fontWeight: 700,
+    fontSize: "0.68rem",
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: tokens.brand,
+  },
+  secondaryText: {
+    fontSize: "0.75rem",
+    color: tokens.textLightSecondary,
+  },
+  monoChip: {
+    height: 30, // matches size="small" buttons so they line up
+    fontFamily: tokens.mono,
+    fontSize: "0.6rem",
+    fontWeight: 700,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    "& .MuiChip-label": { px: 1.25 },
+  },
+  iconTile: {
+    width: 34,
+    height: 34,
+    borderRadius: "8px",
+    bgcolor: tokens.brand,
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+};
 const theme = createTheme({
   // =========================================================
   // PALETTE

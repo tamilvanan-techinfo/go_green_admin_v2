@@ -27,24 +27,18 @@ import api from "../../config.json";
 import { useSocket } from "../../context/SocketContext";
 
 const SCREEN_API_URL = `${api.apiBase}/screens/screen-position/`;
+// Adjust this to wherever your backend exposes the list of monitors
+// and the LED UI resolution currently running on each of them.
+const MONITORS_API_URL = `${api.apiBase}/screens/monitors-led-status/`;
 
 const initialSettings = {
   width: "1080",
   height: "1920",
   positionX: "0",
   positionY: "1",
-  fullscreen: false,
-  alwaysOnTop: false,
 };
 
-const FIELD_KEYS = [
-  "width",
-  "height",
-  "positionX",
-  "positionY",
-  "fullscreen",
-  "alwaysOnTop",
-];
+const FIELD_KEYS = ["width", "height", "positionX", "positionY"];
 
 const NUMERIC_FIELDS = new Set([
   "width",
@@ -56,7 +50,6 @@ const NUMERIC_FIELDS = new Set([
 const FIELD_MAP = {
   positionX: "x",
   positionY: "y",
-  alwaysOnTop: "always_on_top",
 };
 
 function formFromScreen(screen) {
@@ -67,9 +60,6 @@ function formFromScreen(screen) {
     height: String(get("height") ?? initialSettings.height),
     positionX: String(get("positionX") ?? initialSettings.positionX),
     positionY: String(get("positionY") ?? initialSettings.positionY),
-    fullscreen: get("fullscreen") ?? initialSettings.fullscreen,
-    alwaysOnTop: get("alwaysOnTop") ?? initialSettings.alwaysOnTop,
-   
   };
 }
 
@@ -91,6 +81,10 @@ function ScreenControl() {
 
   const [receiverOn, setReceiverOn] = useState(false);
   const [receiverToggling, setReceiverToggling] = useState(false);
+
+  // Monitors + LED UI usage per monitor.
+  const [monitors, setMonitors] = useState([]);
+  const [monitorsLoading, setMonitorsLoading] = useState(true);
 
   // Load the current screen configuration.
   useEffect(() => {
@@ -172,6 +166,50 @@ function ScreenControl() {
       active = false;
     };
   }, []);
+
+  // Load monitors + per-monitor LED UI resolution usage.
+  const loadMonitors = useCallback(async () => {
+    setMonitorsLoading(true);
+
+    try {
+      // Prefer live data from Electron if available (actual connected
+      // displays), falling back to the backend endpoint.
+      let monitorList = [];
+
+      if (window.electronAPI?.getMonitorsLedStatus) {
+        const result = await window.electronAPI.getMonitorsLedStatus();
+        monitorList = Array.isArray(result) ? result : [];
+      } else {
+        const response = await fetch(MONITORS_API_URL);
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to load monitors (${response.status}).`
+          );
+        }
+
+        const data = await response.json();
+        monitorList = Array.isArray(data) ? data : data?.monitors || [];
+      }
+
+      setMonitors(monitorList);
+    } catch (error) {
+      console.error("Could not load monitors LED status:", error);
+      setMonitors([]);
+    } finally {
+      setMonitorsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMonitors();
+  }, [loadMonitors]);
+
+  // Re-fetch monitor usage whenever the LED UI is toggled, so the
+  // "used vs free resolution" numbers stay accurate.
+  useEffect(() => {
+    loadMonitors();
+  }, [receiverOn, loadMonitors]);
 
   const updateSetting = useCallback((key, value) => {
     setSettings((previous) => ({
@@ -257,9 +295,6 @@ function ScreenControl() {
         properties: changedProperties,
       });
 
-      // This records the submitted values as the new baseline.
-      // If your socket supports acknowledgements, update the baseline
-      // after receiving a successful acknowledgement instead.
       setBaseline({ ...settings });
 
      
@@ -403,11 +438,36 @@ function ScreenControl() {
     },
   };
 
-  const toggleOptions = [
-    { key: "fullscreen", label: "FULLSCREEN" },
-    { key: "alwaysOnTop", label: "ALWAYS ON TOP" },
-    { key: "led", label: "START LED UI" },
-  ];
+  // Helper: compute used vs free resolution/area for a monitor entry.
+  // Expects each monitor to look roughly like:
+  // { id, name, width, height, ledWidth, ledHeight }
+  const getMonitorUsage = (monitor) => {
+    const monitorWidth = Number(monitor.width) || 0;
+    const monitorHeight = Number(monitor.height) || 0;
+    const ledWidth = Number(monitor.ledWidth ?? monitor.led_width) || 0;
+    const ledHeight = Number(monitor.ledHeight ?? monitor.led_height) || 0;
+
+    const totalArea = monitorWidth * monitorHeight;
+    const usedArea = ledWidth * ledHeight;
+    const freeArea = Math.max(totalArea - usedArea, 0);
+
+    const freeWidth = Math.max(monitorWidth - ledWidth, 0);
+    const freeHeight = Math.max(monitorHeight - ledHeight, 0);
+
+    const usedPercent =
+      totalArea > 0 ? Math.round((usedArea / totalArea) * 100) : 0;
+
+    return {
+      monitorWidth,
+      monitorHeight,
+      ledWidth,
+      ledHeight,
+      freeWidth,
+      freeHeight,
+      usedPercent,
+      hasLed: ledWidth > 0 && ledHeight > 0,
+    };
+  };
 
   if (loading) {
     return (
@@ -610,40 +670,148 @@ function ScreenControl() {
           </Stack>
         </Box>
 
-        {/* Window behavior */}
-        <Box sx={{ mb: 1.5 }}>
+        {/* Window behavior - single LED UI toggle */}
+        <Box sx={{ mb: 1.75 }}>
           <Typography sx={sectionTitleSx}>
             WINDOW BEHAVIOR
           </Typography>
 
-          {toggleOptions.map((option) => (
-            <Box key={option.key} sx={toggleRowSx}>
-              <Typography
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "text.primary",
-                }}
-              >
-                {option.label}
-              </Typography>
+          <Box sx={toggleRowSx}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: "text.primary",
+              }}
+            >
+              START LED UI
+            </Typography>
 
-              <Switch
-                size="small"
-                checked={Boolean(settings[option.key])}
-                onChange={(event) =>
-                  updateSetting(option.key, event.target.checked)
-                }
-                inputProps={{ "aria-label": option.label }}
-                sx={compactSwitchSx}
-              />
-            </Box>
-          ))}
-
+            <Switch
+              size="small"
+              checked={receiverOn}
+              disabled={receiverToggling}
+              onChange={(event) =>
+                handleReceiverToggle(event.target.checked)
+              }
+              inputProps={{ "aria-label": "START LED UI" }}
+              sx={compactSwitchSx}
+            />
+          </Box>
         </Box>
-        {/* LED UI receiver */}
 
-    
+        {/* LED UI usage per monitor */}
+        <Box sx={{ mb: 1.75 }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{ mb: 0.8 }}
+          >
+            <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
+              LED UI ON MONITORS
+            </Typography>
+
+            {monitorsLoading && <CircularProgress size={12} />}
+          </Stack>
+
+          {!monitorsLoading && monitors.length === 0 && (
+            <Typography
+              sx={{
+                fontSize: 11,
+                color: "text.disabled",
+              }}
+            >
+              No monitors detected.
+            </Typography>
+          )}
+
+          <Stack spacing={1}>
+            {monitors.map((monitor, index) => {
+              const usage = getMonitorUsage(monitor);
+              const key = monitor.id ?? monitor.name ?? index;
+
+              return (
+                <Box
+                  key={key}
+                  sx={{
+                    p: 1.1,
+                    borderRadius: "9px",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    bgcolor: "background.paper",
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ mb: 0.5 }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "text.primary",
+                      }}
+                    >
+                      {monitor.name || `Monitor ${index + 1}`}
+                    </Typography>
+
+                    <Chip
+                      size="small"
+                      label={usage.hasLed ? "LED ACTIVE" : "NO LED"}
+                      sx={{
+                        height: 18,
+                        fontSize: 9,
+                        fontWeight: 700,
+                        fontFamily: '"JetBrains Mono", monospace',
+                        bgcolor: usage.hasLed ? "#ECFDF5" : "action.hover",
+                        color: usage.hasLed ? "#059669" : "text.secondary",
+                        border: "1px solid",
+                        borderColor: usage.hasLed ? "#A7F3D0" : "divider",
+                      }}
+                    />
+                  </Stack>
+
+                  <Typography
+                    sx={{
+                      fontSize: 10,
+                      fontFamily: '"JetBrains Mono", monospace',
+                      color: "text.secondary",
+                    }}
+                  >
+                    Monitor: {usage.monitorWidth}×{usage.monitorHeight}
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      fontSize: 10,
+                      fontFamily: '"JetBrains Mono", monospace',
+                      color: "text.secondary",
+                    }}
+                  >
+                    LED UI: {usage.hasLed
+                      ? `${usage.ledWidth}×${usage.ledHeight}`
+                      : "—"}
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      fontSize: 10,
+                      fontFamily: '"JetBrains Mono", monospace',
+                      color: "text.secondary",
+                    }}
+                  >
+                    Free space: {usage.freeWidth}×{usage.freeHeight}
+                    {" "}
+                    ({usage.usedPercent}% used)
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Stack>
+        </Box>
 
         {feedback && (
           <Alert
