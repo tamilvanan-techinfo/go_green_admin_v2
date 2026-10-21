@@ -1,15 +1,18 @@
+
 use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
 };
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
+
 use tauri::{AppHandle, Manager};
 
-use super::process::CREATE_NO_WINDOW;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
-pub(super) fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+use crate::process::CREATE_NO_WINDOW;
+
+pub fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
 
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -17,16 +20,20 @@ pub(super) fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-pub(super) fn state_file(app: &AppHandle) -> Result<PathBuf, String> {
+pub fn state_file(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("managed_backends.json"))
 }
 
-fn looks_like_backend_root(path: &Path) -> bool {
+pub fn log_path(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
+    Ok(app_data_dir(app)?.join(format!("{name}.log")))
+}
+
+pub fn looks_like_backend_root(path: &Path) -> bool {
     path.join("electricity_monitoring_be").is_dir()
         && path.join("local_folder").is_dir()
 }
 
-pub(super) fn discover_backend_root() -> Result<PathBuf, String> {
+pub fn discover_backend_root() -> Result<PathBuf, String> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     // 1. Environment variable inherited by the current app.
@@ -65,7 +72,7 @@ pub(super) fn discover_backend_root() -> Result<PathBuf, String> {
         }
     }
 
-    // 3. App-relative fallback.
+    // 3. App-relative fallback candidates.
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             candidates.extend(parent.ancestors().map(Path::to_path_buf));
@@ -101,10 +108,11 @@ pub(super) fn discover_backend_root() -> Result<PathBuf, String> {
     )
 }
 
-pub(super) fn python_executable(
+pub fn python_executable(
     root: &Path,
     requested_mode: &str,
 ) -> Result<PathBuf, String> {
+    // Respect the Python mode saved by the backend installer, if present.
     let saved_mode = fs::read_to_string(root.join(".python_mode"))
         .ok()
         .map(|value| value.trim().to_string());
@@ -134,6 +142,7 @@ pub(super) fn python_executable(
         }
 
         "system" => {
+            // Use the explicit Python path saved by the installer, if valid.
             if let Ok(value) = fs::read_to_string(root.join(".python_path")) {
                 let candidate = PathBuf::from(value.trim());
 
@@ -148,11 +157,3 @@ pub(super) fn python_executable(
         _ => Err(format!("Unsupported Python mode: {mode}")),
     }
 }
-
-pub(super) fn log_path(
-    app: &AppHandle,
-    name: &str,
-) -> Result<PathBuf, String> {
-    Ok(app_data_dir(app)?.join(format!("{name}.log")))
-}
-

@@ -1,3 +1,4 @@
+
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -10,46 +11,25 @@ use std::{
 
 use tauri::AppHandle;
 
-use super::discovery::state_file;
+use crate::{
+    backend::backend_info,
+    discovery::state_file,
+};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
-
-pub(super) const CREATE_NO_WINDOW: u32 = 0x08000000;
+#[cfg(windows)]
+pub const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(super) struct ManagedProcess {
+pub struct ManagedProcess {
     pub pid: u32,
     pub project_dir: String,
     pub python_mode: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct BackendStatus {
-    pub name: String,
-    pub port: u16,
-    pub pid: Option<u32>,
-    pub running: bool,
-    pub healthy: bool,
-    pub log_file: String,
-}
-
-pub(super) fn backend_info(
-    name: &str,
-) -> Result<(&'static str, u16, &'static str), String> {
-    match name {
-        "django" => Ok((
-            "electricity_monitoring_be.application:application",
-            8000,
-            "django",
-        )),
-        "fastapi" => Ok(("local_folder.main:app", 8001, "fastapi")),
-        _ => Err(format!("Unknown backend: {name}")),
-    }
-}
-
-pub(super) fn load_state(
+pub fn load_state(
     app: &AppHandle,
 ) -> Result<BTreeMap<String, ManagedProcess>, String> {
     let path = state_file(app)?;
@@ -63,18 +43,19 @@ pub(super) fn load_state(
     serde_json::from_str(&contents).map_err(|e| e.to_string())
 }
 
-pub(super) fn save_state(
+pub fn save_state(
     app: &AppHandle,
     state: &BTreeMap<String, ManagedProcess>,
 ) -> Result<(), String> {
     let path = state_file(app)?;
+
     let contents =
         serde_json::to_string_pretty(state).map_err(|e| e.to_string())?;
 
     fs::write(path, contents).map_err(|e| e.to_string())
 }
 
-fn process_command_line(pid: u32) -> Option<String> {
+pub fn process_command_line(pid: u32) -> Option<String> {
     #[cfg(windows)]
     {
         let filter = format!("ProcessId = {pid}");
@@ -96,11 +77,11 @@ fn process_command_line(pid: u32) -> Option<String> {
             return None;
         }
 
-        return Some(
+        Some(
             String::from_utf8_lossy(&output.stdout)
                 .trim()
                 .to_string(),
-        );
+        )
     }
 
     #[cfg(not(windows))]
@@ -110,7 +91,7 @@ fn process_command_line(pid: u32) -> Option<String> {
     }
 }
 
-pub(super) fn process_matches_backend(pid: u32, name: &str) -> bool {
+pub fn process_matches_backend(pid: u32, name: &str) -> bool {
     let Some(command_line) = process_command_line(pid) else {
         return false;
     };
@@ -122,7 +103,7 @@ pub(super) fn process_matches_backend(pid: u32, name: &str) -> bool {
     command_line.contains("uvicorn") && command_line.contains(module)
 }
 
-pub(super) fn http_responds(port: u16) -> bool {
+pub fn http_responds(port: u16) -> bool {
     let address = ("127.0.0.1", port)
         .to_socket_addrs()
         .ok()

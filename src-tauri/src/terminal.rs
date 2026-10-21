@@ -1,16 +1,16 @@
 use std::process::Command;
 use tauri::AppHandle;
 
-use super::{
+use crate::{
+    backend::backend_info,
     discovery::log_path,
-    process::backend_info
 };
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
 #[tauri::command]
-pub(super) fn show_backend_terminal(
+pub fn show_backend_terminal(
     app: AppHandle,
     name: String,
 ) -> Result<(), String> {

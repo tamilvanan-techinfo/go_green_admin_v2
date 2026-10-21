@@ -1,11 +1,12 @@
+
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
-use super::discovery::discover_backend_root;
+use crate::discovery::discover_backend_root;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct MeterConfig {
+pub struct MeterConfig {
     pub port: String,
     pub baud_rate: u32,
     /// Polling interval in seconds.
@@ -13,12 +14,12 @@ pub(super) struct MeterConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct BackendConfigs {
+pub struct BackendConfigs {
     pub ac: MeterConfig,
     pub dc: MeterConfig,
 }
 
-fn read_env_value(contents: &str, key: &str) -> Option<String> {
+pub fn read_env_value(contents: &str, key: &str) -> Option<String> {
     contents.lines().find_map(|line| {
         let line = line.trim();
 
@@ -42,7 +43,7 @@ fn read_env_value(contents: &str, key: &str) -> Option<String> {
     })
 }
 
-fn parse_env_number<T: std::str::FromStr>(
+pub fn parse_env_number<T: std::str::FromStr>(
     contents: &str,
     key: &str,
     default: T,
@@ -52,7 +53,57 @@ fn parse_env_number<T: std::str::FromStr>(
         .unwrap_or(default)
 }
 
-fn read_ac_config(root: &Path) -> Result<MeterConfig, String> {
+pub fn set_env_value(contents: &str, key: &str, value: &str) -> String {
+    let mut output = Vec::new();
+    let mut found = false;
+
+    for line in contents.lines() {
+        let matches_key = line
+            .split_once('=')
+            .map(|(left, _)| left.trim() == key)
+            .unwrap_or(false);
+
+        if matches_key {
+            output.push(format!("{key}={value}"));
+            found = true;
+        } else {
+            output.push(line.to_string());
+        }
+    }
+
+    if !found {
+        output.push(format!("{key}={value}"));
+    }
+
+    let mut result = output.join("\n");
+    result.push('\n');
+    result
+}
+
+pub fn validate_meter_config(
+    label: &str,
+    config: &MeterConfig,
+) -> Result<(), String> {
+    if config.port.trim().is_empty() {
+        return Err(format!("Select a COM port for {label}."));
+    }
+
+    if config.baud_rate == 0 {
+        return Err(format!(
+            "Baud rate for {label} must be greater than zero."
+        ));
+    }
+
+    if config.poll_interval < 1 || config.poll_interval > 3600 {
+        return Err(format!(
+            "Polling interval for {label} must be between 1 and 3600 seconds."
+        ));
+    }
+
+    Ok(())
+}
+
+pub fn read_ac_config(root: &Path) -> Result<MeterConfig, String> {
     let path = root.join("local_folder").join("meter_config.json");
 
     if !path.exists() {
@@ -63,13 +114,12 @@ fn read_ac_config(root: &Path) -> Result<MeterConfig, String> {
         });
     }
 
-    let contents =
-        fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let contents = fs::read_to_string(&path).map_err(|e| e.to_string())?;
 
     let value: serde_json::Value = serde_json::from_str(&contents)
         .map_err(|e| format!("Could not parse {}: {e}", path.display()))?;
 
-    // Convert older millisecond values to seconds.
+    // Convert legacy millisecond values to seconds.
     let raw_poll = value
         .get("poll_interval")
         .and_then(|v| v.as_u64())
@@ -95,7 +145,7 @@ fn read_ac_config(root: &Path) -> Result<MeterConfig, String> {
     })
 }
 
-fn read_dc_config(root: &Path) -> Result<MeterConfig, String> {
+pub fn read_dc_config(root: &Path) -> Result<MeterConfig, String> {
     let path = root.join(".env");
 
     let contents = if path.exists() {
@@ -104,6 +154,7 @@ fn read_dc_config(root: &Path) -> Result<MeterConfig, String> {
         String::new()
     };
 
+    // Convert legacy millisecond values to seconds.
     let raw_poll: u64 = read_env_value(&contents, "DC_POLL")
         .and_then(|v| v.parse().ok())
         .unwrap_or(1000);
@@ -115,19 +166,14 @@ fn read_dc_config(root: &Path) -> Result<MeterConfig, String> {
     };
 
     Ok(MeterConfig {
-        port: read_env_value(&contents, "DC_COM_PORT")
-            .unwrap_or_default(),
-        baud_rate: parse_env_number(
-            &contents,
-            "DC_BAUDRATE",
-            9600_u32,
-        ),
+        port: read_env_value(&contents, "DC_COM_PORT").unwrap_or_default(),
+        baud_rate: parse_env_number(&contents, "DC_BAUDRATE", 9600_u32),
         poll_interval: poll_secs,
     })
 }
 
 #[tauri::command]
-pub(super) fn get_backend_configs() -> Result<BackendConfigs, String> {
+pub fn get_backend_configs() -> Result<BackendConfigs, String> {
     let root = discover_backend_root()?;
 
     Ok(BackendConfigs {
@@ -136,67 +182,14 @@ pub(super) fn get_backend_configs() -> Result<BackendConfigs, String> {
     })
 }
 
-fn validate_meter_config(
-    label: &str,
-    config: &MeterConfig,
-) -> Result<(), String> {
-    if config.port.trim().is_empty() {
-        return Err(format!("Select a COM port for {label}."));
-    }
-
-    if config.baud_rate == 0 {
-        return Err(format!(
-            "Baud rate for {label} must be greater than zero."
-        ));
-    }
-
-    if config.poll_interval < 1 || config.poll_interval > 3600 {
-        return Err(format!(
-            "Polling interval for {label} must be between 1 and 3600 seconds."
-        ));
-    }
-
-    Ok(())
-}
-
-fn set_env_value(contents: &str, key: &str, value: &str) -> String {
-    let mut output = Vec::new();
-    let mut found = false;
-
-    for line in contents.lines() {
-        let matches_key = line
-            .split_once('=')
-            .map(|(left, _)| left.trim() == key)
-            .unwrap_or(false);
-
-        if matches_key {
-            output.push(format!("{key}={value}"));
-            found = true;
-        } else {
-            output.push(line.to_string());
-        }
-    }
-
-    if !found {
-        output.push(format!("{key}={value}"));
-    }
-
-    let mut result = output.join("\n");
-    result.push('\n');
-
-    result
-}
-
 #[tauri::command]
-pub(super) fn save_backend_configs(
-    configs: BackendConfigs,
-) -> Result<(), String> {
+pub fn save_backend_configs(configs: BackendConfigs) -> Result<(), String> {
     validate_meter_config("AC meter", &configs.ac)?;
     validate_meter_config("DC meter", &configs.dc)?;
 
     let root = discover_backend_root()?;
 
-    // AC configuration: local_folder/meter_config.json
+    // Save AC configuration to local_folder/meter_config.json.
     let ac_path = root.join("local_folder").join("meter_config.json");
 
     if let Some(parent) = ac_path.parent() {
@@ -221,17 +214,15 @@ pub(super) fn save_backend_configs(
 
     ac_json["port"] = serde_json::Value::String(configs.ac.port.clone());
     ac_json["baudrate"] = serde_json::json!(configs.ac.baud_rate);
-    ac_json["poll_interval"] =
-        serde_json::json!(configs.ac.poll_interval);
+    ac_json["poll_interval"] = serde_json::json!(configs.ac.poll_interval);
 
     fs::write(
         &ac_path,
-        serde_json::to_string_pretty(&ac_json)
-            .map_err(|e| e.to_string())?,
+        serde_json::to_string_pretty(&ac_json).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
 
-    // DC configuration: backend root .env
+    // Save DC configuration to the backend root .env file.
     let env_path = root.join(".env");
 
     let env_contents = if env_path.exists() {

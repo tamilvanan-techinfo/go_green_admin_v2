@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState } from "react";
 import { Box } from "@mui/material";
 
@@ -8,6 +7,27 @@ import ScreenControl from "./ScreenControl";
 import GroupRankingScreenController from "./GroupRankingScreenController";
 import LiveGraphControl from "./LiveGraphControl";
 import ScreenWindows from "./ScreenWindows";
+import Screens from "./Screens";
+
+// ─── Thin scrollbar using theme colors ───────────────────────
+const thinScrollbar = {
+  "&::-webkit-scrollbar": {
+    width: 4,
+  },
+  "&::-webkit-scrollbar-track": {
+    backgroundColor: "#EFF1FF", // theme background.default
+    borderRadius: 10,
+  },
+  "&::-webkit-scrollbar-thumb": {
+    backgroundColor: "#D9DEEE", // theme divider
+    borderRadius: 10,
+    "&:hover": {
+      backgroundColor: "#047857", // theme primary.light
+    },
+  },
+  scrollbarWidth: "thin",          // Firefox
+  scrollbarColor: "#D9DEEE #EFF1FF", // Firefox thumb + track
+};
 
 function ScreenManager() {
   const [controlFor, setControlFor] = useState("");
@@ -32,22 +52,15 @@ function ScreenManager() {
           overflowX: "hidden",
         }}
       >
-        {/* Main responsive layout */}
         <Box
           sx={{
             display: "grid",
-
-            // Keep the same two-column layout on laptop and desktop.
-            // The columns resize, but never switch to a vertical layout.
-            gridTemplateColumns:
-              "minmax(0, 2fr) minmax(280px, 1fr)",
-
+            gridTemplateColumns: "minmax(0, 0.5fr) minmax(0, 1.5fr) minmax(280px, 1fr)",
             gap: { xs: 1.5, sm: 2, md: 2.5 },
             alignItems: "start",
             width: "100%",
             minWidth: 0,
             boxSizing: "border-box",
-
             "& > *": {
               minWidth: 0,
               maxWidth: "100%",
@@ -55,7 +68,23 @@ function ScreenManager() {
             },
           }}
         >
-          {/* LEFT: Screen Windows */}
+          {/* COLUMN 1 (low priority): Screens */}
+          <Box
+            sx={{
+              width: "100%",
+              minWidth: 0,
+              maxWidth: "100%",
+              boxSizing: "border-box",
+              overflowX: "hidden",
+              overflowY: "auto",
+              maxHeight: "calc(100vh - 100px)",
+              ...thinScrollbar,
+            }}
+          >
+            <Screens handleControlFor={changeControl} />
+          </Box>
+
+          {/* COLUMN 2 (high priority): Screen Windows */}
           <Box
             sx={{
               width: "100%",
@@ -68,7 +97,7 @@ function ScreenManager() {
             <ScreenWindows />
           </Box>
 
-          {/* RIGHT: Add Screen and Screen Control */}
+          {/* COLUMN 3: AddScreen + ScreenControl */}
           <Box
             sx={{
               display: "flex",
@@ -79,7 +108,6 @@ function ScreenManager() {
               minWidth: 0,
               maxWidth: "100%",
               boxSizing: "border-box",
-
               "& > *": {
                 width: "100%",
                 minWidth: 0,
