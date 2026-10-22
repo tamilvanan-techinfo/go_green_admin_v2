@@ -24,6 +24,11 @@ import {
   Typography,
 } from "@mui/material";
 
+
+import DeleteIcon from "@mui/icons-material/Delete";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import { alpha } from "@mui/material/styles";
+
 import WindowOutlinedIcon from "@mui/icons-material/WindowOutlined";
 import MonitorOutlinedIcon from "@mui/icons-material/MonitorOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -541,6 +546,71 @@ function WindowCard({
 }
 
 
+
+function DeleteWindowDialog({ open, windowItem, busy, onConfirm, onCancel }) {
+  return (
+    <Dialog
+      open={open}
+      onClose={busy ? undefined : onCancel}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Box
+            sx={{
+              width: 38,
+              height: 38,
+              borderRadius: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "error.main",
+              backgroundColor: (theme) => alpha(theme.palette.error.main, 0.1),
+            }}
+          >
+            <WarningAmberIcon fontSize="small" />
+          </Box>
+
+          <Typography component="span" variant="h6">
+            Delete window?
+          </Typography>
+        </Stack>
+      </DialogTitle>
+
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary">
+          <strong>{windowItem?.name}</strong> will be removed
+          {windowItem?.pid ? " and the running app will be closed" : ""}.
+          This action cannot be undone.
+        </Typography>
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button variant="outlined" onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+
+        <Button
+          variant="contained"
+          color="error"
+          onClick={onConfirm}
+          disabled={busy}
+          startIcon={
+            busy ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              <DeleteIcon />
+            )
+          }
+        >
+          {busy ? "Deleting..." : "Delete"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // ─── ScreenWindows ────────────────────────────────────────────────────────────
 
 function ScreenWindows() {
@@ -555,6 +625,10 @@ function ScreenWindows() {
   const [openAddNewWindow, setOpenAddNewWindow] = useState(false);
   const [editWindow, setEditWindow] = useState(false);
   const [notice, setNotice] = useState("");
+
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchWindows = useCallback(async ({ silent = false } = {}) => {
     if (silent) {
@@ -595,9 +669,50 @@ function ScreenWindows() {
     }
   }, []);
 
+
+  const confirmDeleteWindow = useCallback(async () => {
+    if (!deleteTarget) return;
+
+    const windowId = deleteTarget.id ?? deleteTarget.pk;
+    if (!windowId) {
+      setDeleteTarget(null);
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      const response = await fetch(`${api.apiBase}/screens/windows/${windowId}/`, {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result?.error || `Unable to delete window (HTTP ${response.status}).`);
+      }
+
+      setWindows((prev) => prev.filter((w) => (w.id ?? w.pk) !== windowId));
+
+      if (result?.process_close && !result.process_close.success) {
+        setNotice(
+          `"${deleteTarget.name}" deleted, but the running app may still be open: ${result.process_close.message}`
+        );
+      }
+    } catch (err) {
+      console.error("Failed to delete window:", err);
+      setError(err.message || "Unable to delete the window.");
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget]);
+
   useEffect(() => {
     fetchWindows();
   }, [fetchWindows]);
+
 
   const handleOnWindowCreated = useCallback(
    async (data) => {
@@ -627,6 +742,42 @@ function ScreenWindows() {
       );
     }
   };
+
+  const handleDeleteWindow = useCallback(
+    async (item, index) => {
+      const windowId = item?.id ?? item?.pk;
+      if (!windowId) return;
+
+      const confirmed = window.confirm(
+        `Delete "${getWindowName(item, index)}"? This cannot be undone.`
+      );
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch(`${api.apiBase}/screens/windows/${windowId}/`, {
+          method: "DELETE",
+          headers: { Accept: "application/json" },
+        });
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result?.error || `Unable to delete window (HTTP ${response.status}).`);
+        }
+
+        setWindows((prev) => prev.filter((w) => (w.id ?? w.pk) !== windowId));
+
+        if (result?.process_close && !result.process_close.success) {
+          setNotice(
+            `Window deleted, but the running app may still be open: ${result.process_close.message}`
+          );
+        }
+      } catch (err) {
+        console.error("Failed to delete window:", err);
+        setError(err.message || "Unable to delete the window.");
+      }
+    },
+    []
+  );
 
   const handleSelectWindow = useCallback((item) => {
     setEditWindow(true);
@@ -918,7 +1069,7 @@ function ScreenWindows() {
                 onChangeScreen={handleChangeScreen}
                 onFocus={(item, i) => setSelectedWindow({ window: item, index: i })}
                 onConfigure={(item) => handleSelectWindow(item)}
-                onDetach={(item, i) => setSelectedWindow({ window: item, index: i })}
+                onDetach={(item) => setDeleteTarget(item)}
                 onToggleOnline={handleIsOnline}
               />
             </Grid>
@@ -939,6 +1090,13 @@ function ScreenWindows() {
           selectedWindow={selectedWindowData}
         />
       )}
+        <DeleteWindowDialog
+          open={!!deleteTarget}
+          windowItem={deleteTarget}
+          busy={deleting}
+          onConfirm={confirmDeleteWindow}
+          onCancel={() => setDeleteTarget(null)}
+      />
     </Box>
   );
 }

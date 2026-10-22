@@ -28,6 +28,8 @@ import api from "../../config.json";
 import BottomSheet from "../../components/BottonSheet";
 import { Send } from "@mui/icons-material";
 
+import { useToast } from "../Allocations/Ui";
+
 const GREEN = "#047857";
 const DARK_GREEN = "#064E3B";
 const TEXT_PRIMARY = "#0F172A";
@@ -149,8 +151,8 @@ function SectionHeading({ icon, title, description, action }) {
 }
 
 function EditWindow({ onClose, selectedWindow, onSave }) {
+  const toast = useToast();
   const [config, setConfig] = useState(DEFAULT_CONFIG);
-  const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
 
@@ -189,7 +191,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
       .replace(/\/+$/, "");
 
     if (!socketBase) {
-      setNotice("WebSocket URL is missing from config.json.");
+      toast("WebSocket URL is missing from config.json.");
       return;
     }
 
@@ -329,9 +331,9 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
           if (pending) {
             clearPendingPush();
             setSaving(false);
-            setNotice(data.message || "The backend rejected the configuration.");
+            toast(data.message || "The backend rejected the configuration.");
           } else {
-            setNotice(data.message || "Window WebSocket error.");
+            toast(data.message || "Window WebSocket error.");
           }
 
           return;
@@ -339,7 +341,8 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
 
         if (
           data.type === "resolution_changed" ||
-          data.type === "window_updated"
+          data.type === "window_updated" ||
+          data.type === "configuration_pushed"
         ) {
           const responseWindowId =
             data.window_id ?? data.id ?? windowId;
@@ -354,7 +357,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
           if (pending) {
             clearPendingPush();
             setSaving(false);
-            setNotice(
+            toast(
               `Configuration pushed successfully: ${pending.width} × ${pending.height}.`
             );
           }
@@ -427,7 +430,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
         source.always_on_top ?? source.alwaysOnTop ?? false,
     });
 
-    setNotice("");
+    // setNotice("");
     setSaving(false);
   }, [windowData]);
 
@@ -497,12 +500,12 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
       source.always_on_top ?? source.alwaysOnTop ?? false,
   });
 
-  setNotice("");
+  // setNotice("");
 }, [windowData]);
 
   const handleSave = useCallback(async () => {
   if (!windowData || !windowId) {
-    setNotice("No window is selected or the Window ID is missing.");
+    toast("No window is selected or the Window ID is missing.");
     return;
   }
 
@@ -511,7 +514,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
       config[field] === "" ||
       !Number.isFinite(Number(config[field]))
     ) {
-      setNotice(`Enter a valid value for ${field}.`);
+      toast(`Enter a valid value for ${field}.`);
       return;
     }
 
@@ -521,7 +524,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
       ["width", "height"].includes(field) &&
       value <= 0
     ) {
-      setNotice(`${field} must be greater than zero.`);
+      toast(`${field} must be greater than zero.`);
       return;
     }
   }
@@ -529,7 +532,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
   const socket = windowSocketRef.current;
 
   if (!socket || socket.readyState !== WebSocket.OPEN) {
-    setNotice(
+    toast(
       "WebSocket is disconnected. Wait for it to reconnect and try again."
     );
     return;
@@ -552,7 +555,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
   };
 
   setSaving(true);
-  setNotice("");
+  // setNotice("");
 
 
 
@@ -567,11 +570,9 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
   } catch (error) {
     clearPendingPush();
     setSaving(false);
-    setNotice(
+    toast(
       error?.message || "Unable to push window configuration."
     );
-  }finally{
-    setSaving(false)
   }
 }, [config, windowData, windowId, clearPendingPush]);
 
@@ -662,7 +663,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
             boxSizing: "border-box",
           }}
         >
-          {notice && (
+          {/* {notice && (
             <Alert
               severity={
                 notice.toLowerCase().includes("successfully")
@@ -678,7 +679,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
             >
               {notice}
             </Alert>
-          )}
+          )} */}
 
           <Stack spacing={2.5}>
             {/* Position and dimensions */}
