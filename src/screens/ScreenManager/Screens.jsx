@@ -141,6 +141,9 @@ export default function Screens({ handleControlFor }) {
   };
 
   // ─── Save ─────────────────────────────────────────────────
+
+
+// inside handleSave, after successful save:
   const handleSave = async (event) => {
     event.preventDefault();
     setFormLoading(true);
@@ -154,9 +157,25 @@ export default function Screens({ handleControlFor }) {
       formData.append("path", form.path);
       formData.append("is_live", form.is_live ? "true" : "false");
       if (form.thumbnail) formData.append("thumbnail", form.thumbnail);
+
       const response = await fetch(url, { method: isEdit ? "PUT" : "POST", body: formData });
       const data = await response.json();
-      if (!response.ok || !data.status) { alert(data.message || "Failed to save screen"); return; }
+
+      if (!response.ok || !data.status) {
+        alert(data.message || "Failed to save screen");
+        return;
+      }
+
+      // Broadcast the live-switch over the WebSocket so connected
+      // admin/client screens update immediately, instead of relying
+      // on the REST save alone (which has no broadcast).
+      if (form.is_live) {
+        const savedScreenId = isEdit ? form.id : data.data?.id;
+        if (savedScreenId) {
+          send({ type: "set_live_screen", screen_id: savedScreenId });
+        }
+      }
+
       closeDialog();
       await fetchScreens();
     } catch (error) {

@@ -1,28 +1,26 @@
-
 import React, {
   useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
-
+import MonitorsOverview from "./MonitorsOverview";
 import {
   Box,
   Stack,
   Typography,
-  TextField,
   Button,
   Paper,
   Switch,
   Divider,
   Chip,
   CircularProgress,
-  Alert,
 } from "@mui/material";
-
+import { invoke } from "@tauri-apps/api/core";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import SendIcon from "@mui/icons-material/Send";
+import { useToast } from "../Allocations/Ui";
 
 import api from "../../config.json";
 import { useSocket } from "../../context/SocketContext";
@@ -69,13 +67,14 @@ function ScreenControl() {
     setControlledScreen,
   } = useSocket();
 
+  const toast = useToast();
+
   const [screen, setScreen] = useState(null);
   const [settings, setSettings] = useState({ ...initialSettings });
   const [baseline, setBaseline] = useState({ ...initialSettings });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState(null);
 
   const [receiverOn, setReceiverOn] = useState(false);
   const [receiverToggling, setReceiverToggling] = useState(false);
@@ -110,10 +109,7 @@ function ScreenControl() {
         console.error("Could not load screen settings:", error);
 
         if (active) {
-          setFeedback({
-            type: "error",
-            message: "Could not load screen settings.",
-          });
+          toast("Could not load screen settings.", "error");
         }
       } finally {
         if (active) {
@@ -127,7 +123,7 @@ function ScreenControl() {
     return () => {
       active = false;
     };
-  }, [setControlledScreen]);
+  }, [setControlledScreen, toast]);
 
   // Keep screen state synchronized with shared socket updates.
   useEffect(() => {
@@ -147,12 +143,10 @@ function ScreenControl() {
 
     const loadReceiverStatus = async () => {
       try {
-        if (!window.electronAPI?.getReceiverStatus) return;
-
-        const result = await window.electronAPI.getReceiverStatus();
+        const running = await invoke("get_receiver_status");
 
         if (active) {
-          setReceiverOn(Boolean(result?.running));
+          setReceiverOn(Boolean(running));
         }
       } catch (error) {
         console.error("Could not load LED UI status:", error);
@@ -171,8 +165,6 @@ function ScreenControl() {
       ...previous,
       [key]: value,
     }));
-
-    setFeedback(null);
   }, []);
 
   // Compare current values against the last loaded/applied baseline.
@@ -206,7 +198,6 @@ function ScreenControl() {
 
   const handleReset = useCallback(() => {
     setSettings({ ...baseline });
-    setFeedback(null);
   }, [baseline]);
 
   // Apply modified screen properties through the shared WebSocket.
@@ -214,10 +205,10 @@ function ScreenControl() {
     if (!hasChanges) return;
 
     if (!connected) {
-      setFeedback({
-        type: "error",
-        message: "WebSocket is disconnected. Please reconnect and try again.",
-      });
+      toast(
+        "WebSocket is disconnected. Please reconnect and try again.",
+        "error"
+      );
       return;
     }
 
@@ -228,10 +219,7 @@ function ScreenControl() {
       Number(settings.height) <= 0;
 
     if (invalidDimension) {
-      setFeedback({
-        type: "error",
-        message: "Width and height must be positive integers.",
-      });
+      toast("Width and height must be positive integers.", "error");
       return;
     }
 
@@ -242,15 +230,14 @@ function ScreenControl() {
       !Number.isFinite(Number(settings.positionY));
 
     if (invalidPosition) {
-      setFeedback({
-        type: "error",
-        message: "Position X and Position Y must be valid numbers.",
-      });
+      toast(
+        "Position X and Position Y must be valid numbers.",
+        "error"
+      );
       return;
     }
 
     setSaving(true);
-    setFeedback(null);
 
     try {
       send({
@@ -261,17 +248,11 @@ function ScreenControl() {
 
       setBaseline({ ...settings });
 
-      setFeedback({
-        type: "success",
-        message: "Screen settings sent successfully.",
-      });
+      toast("Screen settings sent successfully.", "success");
     } catch (error) {
       console.error("Could not send screen settings:", error);
 
-      setFeedback({
-        type: "error",
-        message: "Could not send screen settings.",
-      });
+      toast("Could not send screen settings.", "error");
     } finally {
       setSaving(false);
     }
@@ -282,57 +263,63 @@ function ScreenControl() {
     screen,
     changedProperties,
     send,
+    toast,
   ]);
 
-  // Start or stop the LED receiver using the Electron API.
-  const handleReceiverToggle = useCallback(async (checked) => {
-    const electronAPI = window.electronAPI;
-
-    if (
-      !electronAPI?.startReceiver ||
-      !electronAPI?.stopReceiver
-    ) {
-      setFeedback({
-        type: "error",
-        message: "LED UI receiver controls are unavailable.",
-      });
-      return;
-    }
-
-    setReceiverToggling(true);
-    setFeedback(null);
-
-    try {
-      const result = checked
-        ? await electronAPI.startReceiver()
-        : await electronAPI.stopReceiver();
-
-      setReceiverOn(Boolean(result?.running ?? checked));
-
-      setFeedback({
-        type: "success",
-        message: checked
-          ? "LED UI receiver started."
-          : "LED UI receiver stopped.",
-      });
-    } catch (error) {
-      console.error("Failed to toggle LED UI:", error);
+  // Start or stop the LED receiver using the Tauri command.
+  const handleReceiverToggle = useCallback(
+    async (checked) => {
+      setReceiverToggling(true);
 
       try {
-        const current = await electronAPI.getReceiverStatus();
-        setReceiverOn(Boolean(current?.running));
-      } catch {
-        // Keep the last known receiver status.
-      }
+        const result = checked
+          ? await invoke("start_receiver")
+          : await invoke("stop_receiver");
 
-      setFeedback({
-        type: "error",
-        message: "Failed to change LED UI receiver status.",
-      });
-    } finally {
-      setReceiverToggling(false);
-    }
-  }, []);
+        if (checked) {
+          // Receiver takes a moment to actually come up.
+          setTimeout(async () => {
+            try {
+              const running = await invoke("get_receiver_status");
+              setReceiverOn(Boolean(running));
+            } catch {
+              setReceiverOn(Boolean(result?.success));
+            }
+
+            setReceiverToggling(false);
+          }, 2000);
+        } else {
+          setReceiverOn(false);
+          setReceiverToggling(false);
+        }
+
+        toast(
+          result?.message ||
+            (checked
+              ? "LED UI receiver started."
+              : "LED UI receiver stopped."),
+          result?.success ? "success" : "error"
+        );
+      } catch (error) {
+        console.error("Failed to toggle LED UI:", error);
+
+        try {
+          const running = await invoke("get_receiver_status");
+          setReceiverOn(Boolean(running));
+        } catch {
+          // Keep last known state.
+        }
+
+        toast(
+          "Failed to change LED UI receiver status.",
+          "error"
+        );
+
+        setReceiverToggling(false);
+      }
+    },
+    [toast]
+  );
 
   // Compact field styles.
   const compactFieldSx = {
@@ -527,90 +514,6 @@ function ScreenControl() {
           />
         </Stack>
 
-        <Divider sx={{ mb: 2 }} />
-
-        {/* Dimensions */}
-        <Box sx={{ mb: 1.75 }}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ mb: 0.8 }}
-          >
-            <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
-              DIMENSIONS
-            </Typography>
-          </Stack>
-
-          <Stack direction="row" spacing={1}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Width"
-              type="number"
-              value={settings.width}
-              onChange={(event) =>
-                updateSetting("width", event.target.value)
-              }
-              inputProps={{ min: 1 }}
-              sx={compactFieldSx}
-            />
-
-            <TextField
-              fullWidth
-              size="small"
-              label="Height"
-              type="number"
-              value={settings.height}
-              onChange={(event) =>
-                updateSetting("height", event.target.value)
-              }
-              inputProps={{ min: 1 }}
-              sx={compactFieldSx}
-            />
-          </Stack>
-        </Box>
-
-        {/* Position */}
-        <Box sx={{ mb: 1.75 }}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ mb: 0.8 }}
-          >
-            <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
-              POSITION
-            </Typography>
-          </Stack>
-
-          <Stack direction="row" spacing={1}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Position X"
-              type="number"
-              value={settings.positionX}
-              onChange={(event) =>
-                updateSetting("positionX", event.target.value)
-              }
-              sx={compactFieldSx}
-            />
-
-            <TextField
-              fullWidth
-              size="small"
-              label="Position Y"
-              type="number"
-              value={settings.positionY}
-              onChange={(event) =>
-                updateSetting("positionY", event.target.value)
-              }
-              sx={compactFieldSx}
-            />
-          </Stack>
-        </Box>
-
         {/* Window behavior */}
         <Box sx={{ mb: 1.75 }}>
           <Typography sx={sectionTitleSx}>
@@ -641,24 +544,14 @@ function ScreenControl() {
           </Box>
         </Box>
 
-        {/* Feedback */}
-        {feedback && (
-          <Alert
-            severity={feedback.type}
-            onClose={() => setFeedback(null)}
-            sx={{
-              mb: 1.5,
-              py: 0,
-              fontSize: 11,
-              alignItems: "center",
-              "& .MuiAlert-message": {
-                fontSize: 11,
-              },
-            }}
-          >
-            {feedback.message}
-          </Alert>
-        )}
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Connected monitors + content preview */}
+        <Box sx={{ mb: 1.75 }}>
+          <MonitorsOverview />
+        </Box>
+
+        <Divider sx={{ mb: 2 }} />
 
         {/* Footer actions */}
         <Stack

@@ -394,8 +394,10 @@ function AddNewWindow({ onClose, onCreated }) {
 
       if (!response.ok || result?.status === false) {
         const message =
-          typeof result === "object"
+          result?.error ||
+          (typeof result === "object"
             ? Object.entries(result)
+                .filter(([key]) => key !== "existing_window")
                 .map(([key, value]) => {
                   const detail = Array.isArray(value)
                     ? value.join(", ")
@@ -406,7 +408,7 @@ function AddNewWindow({ onClose, onCreated }) {
                   return `${key}: ${detail}`;
                 })
                 .join("\n")
-            : "Failed to create the window.";
+            : "Failed to create the window.");
 
         throw new Error(message || "Failed to create the window.");
       }
