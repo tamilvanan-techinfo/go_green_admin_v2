@@ -299,8 +299,8 @@ function MonitorsOverview() {
 
     useEffect(() => {
     loadAll();
-    const interval = setInterval(() => loadWindows().then(setWindows), 1000);
-    return () => clearInterval(interval);
+    // const interval = setInterval(() => loadWindows().then(setWindows), 1000);
+    // return () => clearInterval(interval);
     }, [loadAll, loadWindows]);
 
   // Match each monitor to whichever window is currently assigned to

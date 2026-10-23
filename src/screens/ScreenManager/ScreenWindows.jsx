@@ -376,7 +376,7 @@ function WindowCard({
             </Typography>
           </Box>
 
-          <Button
+          {/* <Button
             size="small"
             variant="outlined"
             endIcon={
@@ -417,7 +417,7 @@ function WindowCard({
             }}
           >
             Change
-          </Button>
+          </Button> */}
 
           <Menu
             anchorEl={menuAnchor}

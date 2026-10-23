@@ -222,50 +222,9 @@ export default function Screens({ handleControlFor }) {
 
   // ─── Card renderer ────────────────────────────────────────
   const renderScreenCard = (screen) => (
-    <ScreenCard key={screen.id} islive={Boolean(screen.is_live)}>
+    <ScreenCard key={screen.id} islive={false}>
 
-      {/* LIVE badge */}
-      {screen.is_live && (
-        <Box sx={{
-          position: "absolute",
-          top: -8,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 5,
-          height: 17,
-          minWidth: 100,
-          px: 1,
-          boxSizing: "border-box",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 0.6,
-          bgcolor: "#059669",
-          color: "#FFFFFF",
-          borderRadius: "7px",
-          border: "1px solid #10B981",
-          fontSize: 8.5,
-          fontWeight: 800,
-          lineHeight: 1,
-          letterSpacing: 0.3,
-          whiteSpace: "nowrap",
-          boxShadow: "0 2px 6px rgba(5,150,105,0.22)",
-        }}>
-          <Box sx={{
-            width: 5,
-            height: 5,
-            flexShrink: 0,
-            borderRadius: "50%",
-            bgcolor: "#BBF7D0",
-            animation: "livePulse 1.5s ease-in-out infinite",
-            "@keyframes livePulse": {
-              "0%, 100%": { opacity: 1, transform: "scale(1)" },
-              "50%": { opacity: 0.55, transform: "scale(0.8)" },
-            },
-          }} />
-          BROADCASTING
-        </Box>
-      )}
+
 
       {/* Title + path */}
       <Box sx={{
@@ -366,23 +325,7 @@ export default function Screens({ handleControlFor }) {
         gap: 0.6,
         overflow: "hidden",
       }}>
-        <Typography sx={{ flexShrink: 0, fontSize: 11, lineHeight: 1, color: "text.secondary" }}>
-          Status:
-        </Typography>
-        <Chip
-          label={screen.is_live ? "Live" : "Offline"}
-          size="small"
-          sx={{
-            height: 18,
-            flexShrink: 0,
-            fontSize: 10,
-            fontWeight: 600,
-            bgcolor: screen.is_live ? "#D1FAE5" : "background.default",
-            color: screen.is_live ? "#047857" : "text.secondary",
-            border: `1px solid ${screen.is_live ? "#6EE7B7" : theme.palette.divider}`,
-            "& .MuiChip-label": { px: 0.6 },
-          }}
-        />
+        
         {screen.resolution && (
           <Chip
             label={screen.resolution}
@@ -418,7 +361,7 @@ export default function Screens({ handleControlFor }) {
         <Button
           fullWidth
           size="small"
-          variant={screen.is_live ? "contained" : "outlined"}
+          variant={ "outlined"}
           startIcon={<SettingsIcon sx={{ fontSize: "13px !important" }} />}
           onClick={() => handleControlFor(screen.path)}
           sx={{
@@ -429,20 +372,7 @@ export default function Screens({ handleControlFor }) {
             fontSize: 10,
             letterSpacing: 0.2,
             textTransform: "none",
-            ...(screen.is_live
-              ? {
-                  bgcolor: "#065F46",
-                  color: "#FFFFFF",
-                  border: "1px solid #065F46",
-                  boxShadow: "none",
-                  "& .MuiButton-startIcon": { color: "#34D399", marginRight: "5px" },
-                  "&:hover": {
-                    bgcolor: "#064E3B",
-                    borderColor: "#064E3B",
-                    boxShadow: "0 2px 8px rgba(6,95,70,0.18)",
-                  },
-                }
-              : {
+           
                   borderColor: theme.palette.divider,
                   color: "text.secondary",
                   "& .MuiButton-startIcon": { marginRight: "5px" },
@@ -451,7 +381,6 @@ export default function Screens({ handleControlFor }) {
                     color: "text.primary",
                     bgcolor: "transparent",
                   },
-                }),
           }}
         >
           Control Screen
@@ -533,13 +462,11 @@ export default function Screens({ handleControlFor }) {
       {/* ✅ Grid */}
       <Box sx={{ px: { xs: 1.5, sm: 2 }, pb: { xs: 1.5, sm: 2 } }}>
         {loading ? (
-          <Grid container spacing={1.5} alignItems="stretch">
+          <Stack spacing={1.5} alignItems="stretch">
             {Array.from({ length: 6 }).map((_, index) => (
-              <Grid key={index} item xs={6} sm={4} md={3} lg={2} xl={2}>
-                <SkeletonCard />
-              </Grid>
+              <SkeletonCard key={index} />
             ))}
-          </Grid>
+          </Stack>
         ) : screens.length === 0 ? (
           <Box sx={{
             py: 6,

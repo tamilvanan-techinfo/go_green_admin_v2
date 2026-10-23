@@ -7,15 +7,18 @@ import {
   Button,
   Chip,
   Divider,
+  FormControl,
   Grid,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Switch,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
-
+import TvRoundedIcon from "@mui/icons-material/TvRounded";
 import DesktopWindowsRoundedIcon from "@mui/icons-material/DesktopWindowsRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import AspectRatioRoundedIcon from "@mui/icons-material/AspectRatioRounded";
@@ -27,7 +30,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import api from "../../config.json";
 import BottomSheet from "../../components/BottonSheet";
 import { Send } from "@mui/icons-material";
-
+import { useSocket } from "../../context/SocketContext";
 import { useToast } from "../Allocations/Ui";
 
 const GREEN = "#047857";
@@ -155,11 +158,12 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
-
+  const [screens, setScreens] = useState([]);
   const windowData = selectedWindow?.window ?? selectedWindow;
   const position = windowData?.position_details;
   const assignedScreen = windowData?.active_screen_details;
-
+  const [selectedScreen, setSelectedScreen] = useState(windowData);
+  console.log("Screens:", screens);
   // WebSocket lifecycle refs
   const windowSocketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -179,7 +183,18 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
 
     pendingPushRef.current = null;
   }, []);
-
+  const fetchScreens = async () => {
+    try {
+      const res = await fetch(`${api.apiBase}/api/admin/screens/`);
+      if (!res.ok) throw new Error("Failed to fetch screens");
+      const data = await res.json();
+      console.log("Fetched screens:", data);
+      setScreens(data.data || []);
+    } catch (error) {
+      console.error("Error fetching screens:", error);
+    } finally {
+    }
+  };
   const connectWindowSocket = useCallback(() => {
     if (!windowId) {
       setSocketConnected(false);
@@ -435,6 +450,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
   }, [windowData]);
 
   useEffect(() => {
+    fetchScreens()
     connectWindowSocket();
 
     return () => {
@@ -576,6 +592,39 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
   }
 }, [config, windowData, windowId, clearPendingPush]);
 
+const handleScreenChange = (event) => {
+  const selectedScreenId = event.target.value;
+
+  const Screen = screens.find(
+    (screen) => screen.id === selectedScreenId
+  );
+
+  if (!Screen) return;
+
+  setSelectedScreen(Screen);
+  console.log("Selected Screen:", Screen);
+
+  // Handle the screen selection here.
+  // Example:
+  // navigate(selectedScreen.path);
+};
+const handleSetLive = useCallback(() => {
+  if (!selectedScreen?.id) {
+    console.warn("Please select a screen first.");
+    return;
+  }
+  windowSocketRef.current?.send(
+    JSON.stringify({
+      type: "set_live_screen",
+      window_id: Number(windowId),
+      screen_id: Number(selectedScreen.id),
+    })
+  )
+  console.log("Set Live Screen:", selectedScreen);
+
+  // TODO: Call your backend API or WebSocket here
+  // to mark this screen as live.
+}, [selectedScreen]);
   return (
     <BottomSheet
       width="min(600px, 85vw)"
@@ -599,56 +648,74 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
       >
         {/* Window identity */}
         <Box
+  sx={{
+    flex: "0 0 auto",
+    px: { xs: 2, md: 3 },
+    py: 2,
+    bgcolor: SURFACE,
+    borderBottom: `1px solid ${BORDER}`,
+  }}
+>
+  <Stack
+    direction={{ xs: "column", sm: "row" }}
+    alignItems={{ xs: "flex-start", sm: "center" }}
+    justifyContent="space-between"
+    spacing={1.5}
+  >
+    {/* Window information */}
+    <Stack
+      direction="row"
+      spacing={1.5}
+      sx={{
+        minWidth: 0,
+        alignItems: "center",
+      }}
+    >
+      <Box
           sx={{
-            flex: "0 0 auto",
-            px: { xs: 2, md: 3 },
-            py: 2,
-            bgcolor: SURFACE,
-            borderBottom: `1px solid ${BORDER}`,
+            width: 46,
+            height: 46,
+            flexShrink: 0,
+            display: "grid",
+            placeItems: "center",
+            borderRadius: "11px",
+            bgcolor: "#ECFDF5",
+            color: DARK_GREEN,
+            border: "1px solid #D1FAE5",
           }}
         >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            justifyContent="space-between"
-            spacing={1.5}
-          >
-            <Stack
-              direction="row"
-              spacing={1.5}
-              sx={{ minWidth: 0, alignItems: "center" }}
-            >
-              <Box
-                sx={{
-                  width: 46,
-                  height: 46,
-                  flexShrink: 0,
-                  display: "grid",
-                  placeItems: "center",
-                  borderRadius: "11px",
-                  bgcolor: "#ECFDF5",
-                  color: DARK_GREEN,
-                  border: "1px solid #D1FAE5",
-                }}
-              >
-                <DesktopWindowsRoundedIcon />
-              </Box>
-
-              <Box sx={{ minWidth: 0 }}>
-                <Typography
-                  sx={{
-                    fontSize: "1rem",
-                    fontWeight: 750,
-                    letterSpacing: "-0.025em",
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {windowData?.name ?? "Unnamed Window"}
-                </Typography>
-              </Box>
-            </Stack>
-          </Stack>
+          <DesktopWindowsRoundedIcon />
         </Box>
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontSize: "1rem",
+              fontWeight: 750,
+              letterSpacing: "-0.025em",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {windowData?.name ?? "Unnamed Window"}
+          </Typography>
+
+          <Typography
+            variant="caption"
+            sx={{
+              color: "text.secondary",
+              display: "block",
+              mt: 0.25,
+            }}
+          >
+            Select a screen for this window
+          </Typography>
+        </Box>
+      </Stack>
+
+      {/* Screen selector */}
+      
+    </Stack>
+  </Box>
 
         {/* Scrollable form */}
         <Box
@@ -683,6 +750,128 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
 
           <Stack spacing={2.5}>
             {/* Position and dimensions */}
+            <Paper sx={sectionSx}>
+  <SectionHeading
+    icon={<TvRoundedIcon  fontSize="small" />}
+    title="Screen Management"
+    description="Specify the window coordinates, display size, and opacity."
+  />
+
+  <Stack
+    direction={{ xs: "column", sm: "row" }}
+    spacing={1.5}
+    alignItems={{ xs: "stretch", sm: "center" }}
+    sx={{ mt: 2 }}
+  >
+    {/* Screen Selector */}
+    <FormControl
+      size="small"
+      sx={{
+        minWidth: { xs: "100%", sm: 230 },
+        maxWidth: { sm: 300 },
+        flex: 1,
+      }}
+    >
+      <Select
+        value={selectedScreen?.id ?? ""}
+        onChange={handleScreenChange}
+        displayEmpty
+        MenuProps={{
+          disablePortal: false,
+          sx: {
+            zIndex: 200000,
+          },
+          PaperProps: {
+            sx: {
+              zIndex: 200000,
+              maxHeight: 400,
+              borderRadius: "12px",
+              mt: 1,
+              boxShadow: "0 12px 40px rgba(15, 23, 42, 0.22)",
+              border: `1px solid ${BORDER}`,
+            },
+          },
+        }}
+        sx={{
+          bgcolor: "#FFFFFF",
+          borderRadius: "10px",
+          fontWeight: 600,
+          position: "relative",
+          zIndex: 200000,
+          "& .MuiOutlinedInput-notchedOutline": {
+            borderColor: BORDER,
+          },
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: DARK_GREEN,
+          },
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: DARK_GREEN,
+          },
+        }}
+        renderValue={(selected) => {
+          const screen = screens.find(
+            (item) => String(item.id) === String(selected)
+          );
+
+          return screen?.name ?? "Select screen";
+        }}
+      >
+        <MenuItem value="" disabled>
+          Select screen
+        </MenuItem>
+
+        {screens.map((screen) => (
+          <MenuItem
+            key={screen.id}
+            value={screen.id}
+            sx={{
+              py: 1.2,
+              fontWeight: 500,
+              "&.Mui-selected": {
+                bgcolor: "#ECFDF5",
+                color: DARK_GREEN,
+              },
+              "&.Mui-selected:hover": {
+                bgcolor: "#D1FAE5",
+              },
+            }}
+          >
+            {screen.name}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+
+    {/* Set Live Button */}
+    <Button
+      variant="contained"
+      onClick={handleSetLive}
+      disabled={!selectedScreen?.id}
+      startIcon={<AspectRatioRoundedIcon />}
+      sx={{
+        minWidth: { xs: "100%", sm: 130 },
+        height: 40,
+        borderRadius: "10px",
+        bgcolor: DARK_GREEN,
+        color: "#FFFFFF",
+        fontWeight: 700,
+        textTransform: "none",
+        whiteSpace: "nowrap",
+        boxShadow: "none",
+        "&:hover": {
+          bgcolor: "#047857",
+          boxShadow: "0 4px 12px rgba(6, 78, 59, 0.18)",
+        },
+        "&.Mui-disabled": {
+          bgcolor: "#E2E8F0",
+          color: "#94A3B8",
+        },
+      }}
+    >
+      Set Live
+    </Button>
+  </Stack>
+</Paper>
             <Paper sx={sectionSx}>
               <SectionHeading
                 icon={<AspectRatioRoundedIcon fontSize="small" />}
