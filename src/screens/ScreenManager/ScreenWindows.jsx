@@ -669,6 +669,26 @@ function ScreenWindows() {
     }
   }, []);
 
+  useEffect(() => {
+    const onPushed = (e) => {
+      const { window_id, properties } = e.detail || {};
+      if (!properties) return;
+
+      const merge = (w) => ({
+        ...w,
+        properties: { ...w.properties, ...properties },
+        position_details: { ...w.position_details, ...properties },
+      });
+      const same = (w) => Number(w?.id ?? w?.window_id) === Number(window_id);
+
+      setWindows((prev) => prev.map((w) => (same(w) ? merge(w) : w)));
+      setSelectedWindowData((prev) => (prev && same(prev) ? merge(prev) : prev));
+    };
+
+    window.addEventListener("window-config-pushed", onPushed);
+    return () => window.removeEventListener("window-config-pushed", onPushed);
+  }, []);
+
 
   const confirmDeleteWindow = useCallback(async () => {
     if (!deleteTarget) return;

@@ -219,12 +219,14 @@ export function ToastProvider({ children }) {
       {children}
 
       <Snackbar
+
         open={Boolean(toast)}
-        autoHideDuration={1000}
+        autoHideDuration={3000}
         onClose={() => setToast(null)}
         anchorOrigin={{
           vertical: "top",
           horizontal: "right",
+          
         }}
         sx={{
           mt: 7,

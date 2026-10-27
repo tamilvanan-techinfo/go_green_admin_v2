@@ -44,7 +44,7 @@ function AppLayout({ children, title }) {
     minWidth: 0,
     minHeight: 0,
     position: "relative",
-    overflowY: "auto",
+    overflowY: "hidden",
     scrollbarWidth: "none",
     msOverflowStyle: "none",
     "&::-webkit-scrollbar": { display: "none" },

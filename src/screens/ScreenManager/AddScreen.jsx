@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Box,
   Stack,
@@ -8,39 +8,88 @@ import {
   Paper,
   IconButton,
   Divider,
+  MenuItem,
+  CircularProgress,
 } from "@mui/material";
 
 import AddIcon from "@mui/icons-material/Add";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
-function AddScreen() {
-  const fileInputRef = useRef(null);
+import api from "../../config.json";
+import { GAMES } from "../../constants/game";
+import { useGame } from "../../context/GameContext";
+import { useToast } from "../Allocations/Ui";
 
+const SCREENS_URL = `${api.apiBase}/api/admin/screens/`;
+
+const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/svg+xml"];
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+// Shared compact field styling (same look as before).
+const fieldSx = (mono = false) => ({
+  "& .MuiOutlinedInput-root": {
+    height: 44,
+    fontSize: 13,
+    borderRadius: "8px",
+    alignItems: "center",
+    ...(mono && { fontFamily: '"JetBrains Mono", monospace' }),
+  },
+  "& .MuiOutlinedInput-input": {
+    boxSizing: "border-box",
+    height: "100%",
+    padding: "10px 14px",
+    display: "flex",
+    alignItems: "center",
+  },
+  "& .MuiInputLabel-root": {
+    fontFamily: "Inter, sans-serif",
+    fontSize: 13,
+    color: "text.secondary",
+    top: 0,
+    transform: "translate(14px, 11px) scale(1)",
+    transformOrigin: "top left",
+  },
+  "& .MuiInputLabel-root.Mui-focused, & .MuiInputLabel-root.MuiFormLabel-filled":
+    {
+      transform: "translate(14px, -9px) scale(0.78)",
+      bgcolor: "background.paper",
+      px: 0.5,
+    },
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: "divider",
+  },
+});
+
+function AddScreen({ onCreated }) {
+  const fileInputRef = useRef(null);
+  const toast = useToast();
+  const { selectedGame } = useGame();
+
+  const [game, setGame] = useState(selectedGame || "");
   const [screenName, setScreenName] = useState("");
   const [route, setRoute] = useState("");
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleImageChange = (event) => {
-    const file = event.target.files?.[0];
+  // If the user picks an experience in Change Game after this form
+  // opened, and hasn't chosen a game here yet, follow it.
+  useEffect(() => {
+    if (!game && selectedGame) setGame(selectedGame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGame]);
+
+  const applyImage = (file) => {
     if (!file) return;
 
-    const allowedTypes = [
-      "image/png",
-      "image/jpeg",
-      "image/svg+xml",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      alert("Please upload a PNG, JPG, or SVG image.");
-      event.target.value = "";
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast("Please upload a PNG, JPG, or SVG image.", "error");
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Image size must be 10 MB or less.");
-      event.target.value = "";
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast("Image size must be 10 MB or less.", "error");
       return;
     }
 
@@ -48,6 +97,14 @@ function AddScreen() {
 
     setImage(file);
     setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    applyImage(file);
+    if (!file || !ALLOWED_TYPES.includes(file.type) || file.size > MAX_IMAGE_SIZE) {
+      event.target.value = "";
+    }
   };
 
   const removeImage = () => {
@@ -65,22 +122,58 @@ function AddScreen() {
     setScreenName("");
     setRoute("");
     removeImage();
+    setGame(selectedGame || "");
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     if (!screenName.trim() || !route.trim()) {
-      alert("Please enter the screen name and route.");
+      toast("Please enter the screen name and route.", "error");
       return;
     }
 
-    // Connect your backend API here.
-    console.log({
-      screenName: screenName.trim(),
-      route: route.trim(),
-      image,
-    });
+    if (!game) {
+      toast("Please select a game.", "error");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("name", screenName.trim());
+    formData.append("path", route.trim());
+    formData.append("is_live", "false");
+    formData.append("game", game);
+    if (image) formData.append("thumbnail", image);
+
+    setSaving(true);
+
+    try {
+      // Don't set Content-Type: the browser adds the multipart boundary.
+      const response = await fetch(SCREENS_URL, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.status === false) {
+        throw new Error(
+          data.message ||
+            (data.errors ? JSON.stringify(data.errors) : "Failed to create screen.")
+        );
+      }
+
+      const gameTitle = GAMES.find((g) => g.id === game)?.title || game;
+      toast(`Screen added to ${gameTitle}.`, "success");
+
+      onCreated?.(data.data);
+      handleClear();
+    } catch (error) {
+      console.error("Error creating screen:", error);
+      toast(error.message || "Failed to create screen.", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -172,6 +265,7 @@ function AddScreen() {
 
         <Divider sx={{ mb: 2 }} />
 
+        {/* Screen name */}
         <Box sx={{ mb: 1.75 }}>
           <TextField
             fullWidth
@@ -180,50 +274,14 @@ function AddScreen() {
             value={screenName}
             onChange={(event) => setScreenName(event.target.value)}
             required
+            disabled={saving}
             inputProps={{ maxLength: 100 }}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                height: 44,
-                fontSize: 13,
-                borderRadius: "8px",
-                alignItems: "center",
-              },
-
-              "& .MuiOutlinedInput-input": {
-                boxSizing: "border-box",
-                height: "100%",
-                padding: "10px 14px",
-                display: "flex",
-                alignItems: "center",
-              },
-
-              /* Center the label vertically when the field is empty */
-              "& .MuiInputLabel-root": {
-                fontFamily: "Inter, sans-serif",
-                fontSize: 13,
-                color: "text.secondary",
-                top: 0,
-                transform: "translate(14px, 11px) scale(1)",
-                transformOrigin: "top left",
-              },
-
-              /* Keep the label floating above the text when focused or filled */
-              "& .MuiInputLabel-root.Mui-focused, & .MuiInputLabel-root.MuiFormLabel-filled":
-                {
-                  transform: "translate(14px, -9px) scale(0.78)",
-                  bgcolor: "background.paper",
-                  px: 0.5,
-                },
-
-              "& .MuiOutlinedInput-notchedOutline": {
-                borderColor: "divider",
-              },
-            }}
+            sx={fieldSx()}
           />
         </Box>
 
         {/* Path / Route */}
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 1.75 }}>
           <TextField
             fullWidth
             size="small"
@@ -231,47 +289,35 @@ function AddScreen() {
             value={route}
             onChange={(event) => setRoute(event.target.value)}
             required
+            disabled={saving}
             inputProps={{ maxLength: 150 }}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                height: 44,
-                fontSize: 13,
-                borderRadius: "8px",
-                alignItems: "center",
-                fontFamily: '"JetBrains Mono", monospace',
-              },
-
-              "& .MuiOutlinedInput-input": {
-                boxSizing: "border-box",
-                height: "100%",
-                padding: "10px 14px",
-                display: "flex",
-                alignItems: "center",
-              },
-
-              "& .MuiInputLabel-root": {
-                fontFamily: "Inter, sans-serif",
-                fontSize: 13,
-                color: "text.secondary",
-                top: 0,
-                transform: "translate(14px, 11px) scale(1)",
-                transformOrigin: "top left",
-              },
-
-              "& .MuiInputLabel-root.Mui-focused, & .MuiInputLabel-root.MuiFormLabel-filled":
-                {
-                  transform: "translate(14px, -9px) scale(0.78)",
-                  bgcolor: "background.paper",
-                  px: 0.5,
-                },
-
-              "& .MuiOutlinedInput-notchedOutline": {
-                borderColor: "divider",
-              },
-            }}
+            sx={fieldSx(true)}
           />
         </Box>
 
+        {/* Game */}
+        <Box sx={{ mb: 2 }}>
+          <TextField
+            select
+            fullWidth
+            required
+            size="small"
+            label="Game"
+            value={game}
+            onChange={(event) => setGame(event.target.value)}
+            disabled={saving}
+            sx={fieldSx()}
+            SelectProps={{
+              MenuProps: { sx: { zIndex: 100000 } },
+            }}
+          >
+            {GAMES.map((g) => (
+              <MenuItem key={g.id} value={g.id} sx={{ fontSize: 13 }}>
+                {g.title}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
 
         {/* Upload heading */}
         <Stack
@@ -310,34 +356,7 @@ function AddScreen() {
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
-
-            const file = event.dataTransfer.files?.[0];
-            if (!file) return;
-
-            const allowedTypes = [
-              "image/png",
-              "image/jpeg",
-              "image/svg+xml",
-            ];
-
-            if (!allowedTypes.includes(file.type)) {
-              alert("Please upload a PNG, JPG, or SVG image.");
-              return;
-            }
-
-            if (file.size > 10 * 1024 * 1024) {
-              alert("Image size must be 10 MB or less.");
-              return;
-            }
-
-            if (fileInputRef.current) {
-              const transfer = new DataTransfer();
-              transfer.items.add(file);
-              fileInputRef.current.files = transfer.files;
-              handleImageChange({
-                target: fileInputRef.current,
-              });
-            }
+            applyImage(event.dataTransfer.files?.[0]);
           }}
           sx={{
             height: 125,
@@ -467,11 +486,14 @@ function AddScreen() {
             type="button"
             variant="contained"
             onClick={handleClear}
+            disabled={saving}
             sx={{
               bgcolor: "#F1F5F9",
               color: "text.secondary",
+              boxShadow: "none",
               "&:hover": {
                 bgcolor: "#E2E8F0",
+                boxShadow: "none",
               },
             }}
           >
@@ -482,16 +504,25 @@ function AddScreen() {
             fullWidth
             type="submit"
             variant="contained"
-            startIcon={<AddIcon sx={{ fontSize: "17px !important" }} />}
+            disabled={saving}
+            startIcon={
+              saving ? (
+                <CircularProgress size={14} color="inherit" />
+              ) : (
+                <AddIcon sx={{ fontSize: "17px !important" }} />
+              )
+            }
             sx={{
               bgcolor: "primary.main",
               color: "#FFFFFF",
+              boxShadow: "none",
               "&:hover": {
                 bgcolor: "primary.light",
+                boxShadow: "none",
               },
             }}
           >
-            Add Screen
+            {saving ? "Adding..." : "Add Screen"}
           </Button>
         </Stack>
       </Paper>

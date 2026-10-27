@@ -511,7 +511,9 @@ export default function BackendSettings() {
         await invoke("stop_backend", { name: backend.name });
         toast(`${backend.title} stopped.`);
       } else {
-        await invoke("save_backend_configs", { configs });
+
+        const selectedConfig = {[backend.configKey]: configs[backend.configKey],}
+        await invoke("save_backend_configs", { configs :selectedConfig,  });
         toast(`${backend.title} starting… health check will update shortly.`);
         invoke("start_backend", { name: backend.name, pythonMode }).catch(
           (e) => {
@@ -554,8 +556,16 @@ export default function BackendSettings() {
     runAction(
       backend.name,
       async () => {
-        await invoke("save_backend_configs", { configs });
+        const selectedConfig = {
+          [backend.configKey]: configs[backend.configKey],
+        };
+
+        await invoke("save_backend_configs", {
+          configs: selectedConfig,
+        });
+
         await invoke("stop_backend", { name: backend.name });
+
         return invoke("start_backend", { name: backend.name, pythonMode });
       },
       `${backend.title} restarting…`

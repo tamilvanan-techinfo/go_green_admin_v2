@@ -11,6 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useToast } from '../Allocations/Ui'
+import { useGame } from "../../context/GameContext";
 
 // ─── Design tokens: matched to BackendSettings.jsx ────────────────────────────
 const C = {
@@ -79,7 +80,7 @@ const bodyTextSx = {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function GameChange() {
   const toast = useToast();
-  const [selectedGame, setSelectedGame] = useState(null);
+  const {selectedGame, setSelectedGame} = useGame();
 
   const handleSelect = (game) => {
     setSelectedGame(game.id);

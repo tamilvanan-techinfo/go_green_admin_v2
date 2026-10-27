@@ -182,71 +182,94 @@ pub fn get_backend_configs() -> Result<BackendConfigs, String> {
     })
 }
 
+
 #[tauri::command]
-pub fn save_backend_configs(configs: BackendConfigs) -> Result<(), String> {
-    validate_meter_config("AC meter", &configs.ac)?;
-    validate_meter_config("DC meter", &configs.dc)?;
+pub fn save_backend_configs(
+    configs: PartialBackendConfigs,
+) -> Result<(), String> {
+    // Validate only configurations supplied by the caller.
+    if let Some(ac) = &configs.ac {
+        validate_meter_config("AC meter", ac)?;
+    }
+
+    if let Some(dc) = &configs.dc {
+        validate_meter_config("DC meter", dc)?;
+    }
 
     let root = discover_backend_root()?;
 
-    // Save AC configuration to local_folder/meter_config.json.
-    let ac_path = root.join("local_folder").join("meter_config.json");
+    // Save AC only when AC configuration was supplied.
+    if let Some(ac) = &configs.ac {
+        let ac_path = root.join("local_folder").join("meter_config.json");
 
-    if let Some(parent) = ac_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        if let Some(parent) = ac_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+
+        let mut ac_json = if ac_path.exists() {
+            let contents =
+                fs::read_to_string(&ac_path).map_err(|e| e.to_string())?;
+
+            serde_json::from_str::<serde_json::Value>(&contents)
+                .map_err(|e| format!("Invalid AC meter JSON: {e}"))?
+        } else {
+            serde_json::json!({})
+        };
+
+        if !ac_json.is_object() {
+            return Err(
+                "AC meter configuration must be a JSON object.".to_string(),
+            );
+        }
+
+        ac_json["port"] = serde_json::Value::String(ac.port.clone());
+        ac_json["baudrate"] = serde_json::json!(ac.baud_rate);
+        ac_json["poll_interval"] = serde_json::json!(ac.poll_interval);
+
+        fs::write(
+            &ac_path,
+            serde_json::to_string_pretty(&ac_json)
+                .map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
     }
 
-    let mut ac_json = if ac_path.exists() {
-        let contents =
-            fs::read_to_string(&ac_path).map_err(|e| e.to_string())?;
+    // Save DC only when DC configuration was supplied.
+    if let Some(dc) = &configs.dc {
+        let env_path = root.join(".env");
 
-        serde_json::from_str::<serde_json::Value>(&contents)
-            .map_err(|e| format!("Invalid AC meter JSON: {e}"))?
-    } else {
-        serde_json::json!({})
-    };
+        let env_contents = if env_path.exists() {
+            fs::read_to_string(&env_path).map_err(|e| e.to_string())?
+        } else {
+            String::new()
+        };
 
-    if !ac_json.is_object() {
-        return Err(
-            "AC meter configuration must be a JSON object.".to_string(),
+        let env_contents =
+            set_env_value(&env_contents, "DC_COM_PORT", &dc.port);
+
+        let env_contents = set_env_value(
+            &env_contents,
+            "DC_BAUDRATE",
+            &dc.baud_rate.to_string(),
         );
+
+        let env_contents = set_env_value(
+            &env_contents,
+            "DC_POLL",
+            &dc.poll_interval.to_string(),
+        );
+
+        fs::write(&env_path, env_contents).map_err(|e| e.to_string())?;
     }
-
-    ac_json["port"] = serde_json::Value::String(configs.ac.port.clone());
-    ac_json["baudrate"] = serde_json::json!(configs.ac.baud_rate);
-    ac_json["poll_interval"] = serde_json::json!(configs.ac.poll_interval);
-
-    fs::write(
-        &ac_path,
-        serde_json::to_string_pretty(&ac_json).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
-
-    // Save DC configuration to the backend root .env file.
-    let env_path = root.join(".env");
-
-    let env_contents = if env_path.exists() {
-        fs::read_to_string(&env_path).map_err(|e| e.to_string())?
-    } else {
-        String::new()
-    };
-
-    let env_contents =
-        set_env_value(&env_contents, "DC_COM_PORT", &configs.dc.port);
-
-    let env_contents = set_env_value(
-        &env_contents,
-        "DC_BAUDRATE",
-        &configs.dc.baud_rate.to_string(),
-    );
-
-    let env_contents = set_env_value(
-        &env_contents,
-        "DC_POLL",
-        &configs.dc.poll_interval.to_string(),
-    );
-
-    fs::write(&env_path, env_contents).map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PartialBackendConfigs{
+    pub ac : Option<MeterConfig>,
+    pub dc : Option<MeterConfig>
 }

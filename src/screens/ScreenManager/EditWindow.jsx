@@ -352,6 +352,14 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
             return;
           }
 
+          if (data.properties) {
+            window.dispatchEvent(
+              new CustomEvent("window-config-pushed", {
+                detail: { window_id: responseWindowId, properties: data.properties },
+              })
+            );
+          }
+
           const pending = pendingPushRef.current;
 
           if (pending) {

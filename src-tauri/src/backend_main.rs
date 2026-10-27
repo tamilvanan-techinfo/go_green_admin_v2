@@ -17,7 +17,12 @@ pub fn run() {
             crate::check_receiver::is_electron_running,
             crate::check_receiver::get_receiver_status,
             crate::check_receiver::start_receiver,
-            crate::check_receiver::stop_receiver
+            crate::check_receiver::stop_receiver,
+            crate::new_match::check_server_status,
+            crate::new_match::find_db_path,
+            crate::new_match::get_backup_base_dir,
+            crate::new_match::run_new_match,
+
         ])
         .run(tauri::generate_context!())
         .expect("error while running Go Green Admin");

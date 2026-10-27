@@ -17,6 +17,7 @@ import AppLayout from '../../components/AppLayout';
 import MonitorACMeter from './MonitorACMeter';
 import BackendSettings from "./BackendSettings";
 import GameChange from "./GameChange";
+import StartNewMatch from "./StartNewMatch";
 
 import {
   Box, Stack, Typography, Paper, Chip,
@@ -157,10 +158,8 @@ const SETTING_TABS = [
     key: 'acmeter',
     icon: 'offline_bolt',
     label: 'Monitor AC Meter',
-    
-
-   
   },
+ 
 
 ];
 
@@ -340,29 +339,12 @@ function SettingsTabBar({ active, onChange }) {
               >
                 {tab.key === "acmeter" && "Live meter monitoring"}
                 {tab.key === "changegame" && "Game mode selection"}
-                {tab.key === "newmatch" && "Match configuration"}
+                {tab.key === "newmatch" && "Start a new DB"}
                 {tab.key === "backend" && "Server connections"}
               </Typography>
             </Box>
 
-            {/* Animated active indicator */}
-            <Box
-              sx={{
-                width: 4,
-                alignSelf: "stretch",
-                flexShrink: 0,
-                borderRadius: 99,
-                bgcolor: "#047857",
-                opacity: isActive ? 1 : 0,
-                transform: isActive ? "scaleY(1)" : "scaleY(0.35)",
-                transformOrigin: "center",
-                transition: [
-                  "opacity 220ms ease",
-                  "transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-                ].join(", "),
-                display: { xs: "none", sm: "block" },
-              }}
-            />
+     
           </Box>
         );
       })}
@@ -666,9 +648,7 @@ function Settings() {
         >
           {activeTab === "acmeter" && <MonitorACMeter />}
           {activeTab === "changegame" && <GameChange />}
-          {activeTab === "newmatch" && (
-            <StartNewMatchTab onToast={showToast} />
-          )}
+          {activeTab === "newmatch" && <StartNewMatch/> }
           {activeTab === "backend" && <BackendSettings />}
         </Box>
       </Fade>

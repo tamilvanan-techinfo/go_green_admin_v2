@@ -14,6 +14,7 @@ import CropFreeRoundedIcon from "@mui/icons-material/CropFreeRounded";
 import { availableMonitors, primaryMonitor } from "@tauri-apps/api/window";
 import api from "../../config.json";
 import { useToast } from "../Allocations/Ui";
+
 const WINDOWS_URL = `${api.apiBase}/screens/windows/?role=admin`;
 
 // Max footprint for a single monitor card in the layout grid.
@@ -229,12 +230,14 @@ function MonitorCard({ monitor, content }) {
   );
 }
 
-function MonitorsOverview() {
+function MonitorsOverview({ refreshKey = 0 }) {
   const toast = useToast();
   const [monitors, setMonitors] = useState([]);
   const [windows, setWindows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+ 
+
 
     const loadMonitors = useCallback(async () => {
     try {
@@ -269,6 +272,7 @@ function MonitorsOverview() {
     }
 
     const data = await response.json();
+    console.log("windows from API:", data);
     return Array.isArray(data) ? data : data?.results ?? data?.windows ?? [];
   }, []);
 
@@ -299,9 +303,42 @@ function MonitorsOverview() {
 
     useEffect(() => {
     loadAll();
-    const interval = setInterval(() => loadWindows().then(setWindows), 1000);
-    return () => clearInterval(interval);
-    }, [loadAll, loadWindows]);
+
+    }, []);
+
+
+
+
+    // Apply pushed values straight to the preview, no refetch needed
+    useEffect(() => {
+      const onPushed = (e) => {
+        const { window_id, properties } = e.detail || {};
+        if (!properties) return;
+
+        const x = Number(properties.x ?? 0);
+        const y = Number(properties.y ?? 0);
+        const width = Number(properties.width);
+        const height = Number(properties.height);
+
+        setWindows((prev) => {
+          const sameWindow = (w) =>
+            Number(w.id ?? w.window_id) === Number(window_id);
+
+          if (!prev.some(sameWindow)) {
+            return [...prev, { id: window_id, position_details: { x, y, width, height } }];
+          }
+
+          return prev.map((w) =>
+            sameWindow(w)
+              ? { ...w, position_details: { ...w.position_details, x, y, width, height } }
+              : w
+          );
+        });
+      };
+
+      window.addEventListener("window-config-pushed", onPushed);
+      return () => window.removeEventListener("window-config-pushed", onPushed);
+    }, []);
 
   // Match each monitor to whichever window is currently assigned to
   // its Screen (first active window found, if any).

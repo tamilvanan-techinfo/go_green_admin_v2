@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Box,
   Grid,
@@ -18,9 +18,10 @@ import {
   FormControlLabel,
   Skeleton,
   Avatar,
+  MenuItem,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { styled, keyframes } from "@mui/system";
+import { styled } from "@mui/system";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -29,6 +30,8 @@ import TvOffIcon from "@mui/icons-material/TvOff";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import MonitorIcon from "@mui/icons-material/Monitor";
 import { useSocket } from "../../context/SocketContext";
+import { useGame } from "../../context/GameContext";
+import { GAMES } from "../../constants/game";
 
 // ─── Design tokens ───────────────────────────────────────────
 const API_BASE = "http://localhost:8000";
@@ -38,11 +41,14 @@ const HEADER_H = 48;
 const STATUS_H = 28;
 const BTN_H = 38;
 
-// ─── Live pulse animation ─────────────────────────────────────
-const pulse = keyframes`
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.4; transform: scale(0.7); }
-`;
+const emptyForm = (game = "") => ({
+  id: null,
+  name: "",
+  path: "",
+  is_live: false,
+  thumbnail: null,
+  game,
+});
 
 // ─── Screen card ──────────────────────────────────────────────
 const ScreenCard = styled("div", {
@@ -81,20 +87,28 @@ const ScreenCard = styled("div", {
 export default function Screens({ handleControlFor }) {
   const theme = useTheme();
   const { send } = useSocket();
+  const { selectedGame } = useGame();
 
   const [screens, setScreens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  const [form, setForm] = useState({
-    id: null, name: "", path: "", is_live: false, thumbnail: null,
-  });
+  const [form, setForm] = useState(emptyForm());
 
-  // ─── Fetch ────────────────────────────────────────────────
-  const fetchScreens = async () => {
+  const selectedGameTitle =
+    GAMES.find((g) => g.id === selectedGame)?.title || "";
+
+  // ─── Fetch (re-runs whenever the selected game changes) ───
+  const fetchScreens = useCallback(async () => {
+    if (!selectedGame) {
+      setScreens([]);
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/screens/`);
+      const res = await fetch(
+        `${API_BASE}/api/admin/screens/?game=${encodeURIComponent(selectedGame)}`
+      );
       if (!res.ok) throw new Error("Failed to fetch screens");
       const data = await res.json();
       setScreens(data.data || []);
@@ -103,13 +117,15 @@ export default function Screens({ handleControlFor }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedGame]);
 
-  useEffect(() => { fetchScreens(); }, []);
+  useEffect(() => {
+    fetchScreens();
+  }, [fetchScreens]);
 
   // ─── Dialog helpers ───────────────────────────────────────
   const openAdd = () => {
-    setForm({ id: null, name: "", path: "", is_live: false, thumbnail: null });
+    setForm(emptyForm(selectedGame || ""));
     setFormOpen(true);
   };
 
@@ -120,13 +136,14 @@ export default function Screens({ handleControlFor }) {
       path: screen.path || "",
       is_live: !!screen.is_live,
       thumbnail: null,
+      game: screen.game || selectedGame || "",
     });
     setFormOpen(true);
   };
 
   const closeDialog = () => {
     setFormOpen(false);
-    setForm({ id: null, name: "", path: "", is_live: false, thumbnail: null });
+    setForm(emptyForm());
   };
 
   const handleFormChange = (event) => {
@@ -141,24 +158,32 @@ export default function Screens({ handleControlFor }) {
   };
 
   // ─── Save ─────────────────────────────────────────────────
-
-
-// inside handleSave, after successful save:
   const handleSave = async (event) => {
     event.preventDefault();
+
+    if (!form.game) {
+      alert("Please select a game.");
+      return;
+    }
+
     setFormLoading(true);
     try {
       const isEdit = Boolean(form.id);
       const url = isEdit
         ? `${API_BASE}/api/admin/screens/${form.id}/`
         : `${API_BASE}/api/admin/screens/`;
+
       const formData = new FormData();
       formData.append("name", form.name);
       formData.append("path", form.path);
+      formData.append("game", form.game);
       formData.append("is_live", form.is_live ? "true" : "false");
       if (form.thumbnail) formData.append("thumbnail", form.thumbnail);
 
-      const response = await fetch(url, { method: isEdit ? "PUT" : "POST", body: formData });
+      const response = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
+        body: formData,
+      });
       const data = await response.json();
 
       if (!response.ok || !data.status) {
@@ -166,14 +191,19 @@ export default function Screens({ handleControlFor }) {
         return;
       }
 
-      // Broadcast the live-switch over the WebSocket so connected
-      // admin/client screens update immediately, instead of relying
-      // on the REST save alone (which has no broadcast).
+      // Broadcast the live-switch so connected screens update immediately.
       if (form.is_live) {
         const savedScreenId = isEdit ? form.id : data.data?.id;
         if (savedScreenId) {
           send({ type: "set_live_screen", screen_id: savedScreenId });
         }
+      }
+
+      // Saved under a different game than the one being viewed:
+      // it won't appear in this list, so tell the user.
+      if (form.game !== selectedGame) {
+        const title = GAMES.find((g) => g.id === form.game)?.title || form.game;
+        alert(`Screen saved under ${title}. Switch to that game to see it.`);
       }
 
       closeDialog();
@@ -190,8 +220,14 @@ export default function Screens({ handleControlFor }) {
   const handleDelete = async (screen) => {
     if (!window.confirm(`Delete "${screen.name}"?`)) return;
     try {
-      const response = await fetch(`${API_BASE}/api/admin/screens/${screen.id}/`, { method: "DELETE" });
-      if (!response.ok) { alert("Failed to delete screen"); return; }
+      const response = await fetch(
+        `${API_BASE}/api/admin/screens/${screen.id}/`,
+        { method: "DELETE" }
+      );
+      if (!response.ok) {
+        alert("Failed to delete screen");
+        return;
+      }
       setScreens((prev) => prev.filter((item) => item.id !== screen.id));
     } catch (error) {
       console.error("Error deleting screen:", error);
@@ -200,18 +236,20 @@ export default function Screens({ handleControlFor }) {
 
   // ─── Skeleton ─────────────────────────────────────────────
   const SkeletonCard = () => (
-    <Box sx={{
-      boxSizing: "border-box",
-      display: "flex",
-      flexDirection: "column",
-      width: "100%",
-      height: 240,
-      p: 1.5,
-      gap: 0.75,
-      borderRadius: "10px",
-      border: `1px solid ${theme.palette.divider}`,
-      bgcolor: "background.paper",
-    }}>
+    <Box
+      sx={{
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        height: 240,
+        p: 1.5,
+        gap: 0.75,
+        borderRadius: "10px",
+        border: `1px solid ${theme.palette.divider}`,
+        bgcolor: "background.paper",
+      }}
+    >
       <Skeleton variant="text" width="55%" height={18} />
       <Skeleton variant="text" width="35%" height={13} />
       <Skeleton variant="rounded" sx={{ width: "100%", height: THUMB_H, borderRadius: "7px" }} />
@@ -223,87 +261,96 @@ export default function Screens({ handleControlFor }) {
   // ─── Card renderer ────────────────────────────────────────
   const renderScreenCard = (screen) => (
     <ScreenCard key={screen.id} islive={Boolean(screen.is_live)}>
-
       {/* LIVE badge */}
       {screen.is_live && (
-        <Box sx={{
-          position: "absolute",
-          top: -8,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 5,
-          height: 17,
-          minWidth: 100,
-          px: 1,
-          boxSizing: "border-box",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 0.6,
-          bgcolor: "#059669",
-          color: "#FFFFFF",
-          borderRadius: "7px",
-          border: "1px solid #10B981",
-          fontSize: 8.5,
-          fontWeight: 800,
-          lineHeight: 1,
-          letterSpacing: 0.3,
-          whiteSpace: "nowrap",
-          boxShadow: "0 2px 6px rgba(5,150,105,0.22)",
-        }}>
-          <Box sx={{
-            width: 5,
-            height: 5,
-            flexShrink: 0,
-            borderRadius: "50%",
-            bgcolor: "#BBF7D0",
-            animation: "livePulse 1.5s ease-in-out infinite",
-            "@keyframes livePulse": {
-              "0%, 100%": { opacity: 1, transform: "scale(1)" },
-              "50%": { opacity: 0.55, transform: "scale(0.8)" },
-            },
-          }} />
+        <Box
+          sx={{
+            position: "absolute",
+            top: -8,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 5,
+            height: 17,
+            minWidth: 100,
+            px: 1,
+            boxSizing: "border-box",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 0.6,
+            bgcolor: "#059669",
+            color: "#FFFFFF",
+            borderRadius: "7px",
+            border: "1px solid #10B981",
+            fontSize: 8.5,
+            fontWeight: 800,
+            lineHeight: 1,
+            letterSpacing: 0.3,
+            whiteSpace: "nowrap",
+            boxShadow: "0 2px 6px rgba(5,150,105,0.22)",
+          }}
+        >
+          <Box
+            sx={{
+              width: 5,
+              height: 5,
+              flexShrink: 0,
+              borderRadius: "50%",
+              bgcolor: "#BBF7D0",
+              animation: "livePulse 1.5s ease-in-out infinite",
+              "@keyframes livePulse": {
+                "0%, 100%": { opacity: 1, transform: "scale(1)" },
+                "50%": { opacity: 0.55, transform: "scale(0.8)" },
+              },
+            }}
+          />
           BROADCASTING
         </Box>
       )}
 
       {/* Title + path */}
-      <Box sx={{
-        boxSizing: "border-box",
-        height: HEADER_H,
-        minHeight: HEADER_H,
-        flexShrink: 0,
-        px: 1.5,
-        pt: 1.25,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}>
+      <Box
+        sx={{
+          boxSizing: "border-box",
+          height: HEADER_H,
+          minHeight: HEADER_H,
+          flexShrink: 0,
+          px: 1.5,
+          pt: 1.25,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+        }}
+      >
         <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", pr: 5, minWidth: 0 }}>
-          <Typography sx={{
-            minWidth: 0,
-            flex: 1,
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            fontWeight: 700,
-            fontSize: 12,
-            lineHeight: 1.3,
-            color: "text.primary",
-          }}>
+          <Typography
+            sx={{
+              minWidth: 0,
+              flex: 1,
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              fontWeight: 700,
+              fontSize: 12,
+              lineHeight: 1.3,
+              color: "text.primary",
+            }}
+          >
             {screen.name}
           </Typography>
         </Stack>
-        <Typography sx={{
-          mt: 0.15,
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: 9.5,
-          lineHeight: 1.3,
-          color: "text.secondary",
-        }}>
+        <Typography
+          sx={{
+            mt: 0.15,
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            fontFamily: "'IBM Plex Mono', monospace",
+            fontSize: 9.5,
+            lineHeight: 1.3,
+            color: "text.secondary",
+          }}
+        >
           {screen.path}
         </Typography>
       </Box>
@@ -323,23 +370,25 @@ export default function Screens({ handleControlFor }) {
       </Stack>
 
       {/* Thumbnail */}
-      <Box sx={{
-        mx: 1.5,
-        height: THUMB_H,
-        minHeight: THUMB_H,
-        flexShrink: 0,
-        boxSizing: "border-box",
-        borderRadius: "7px",
-        overflow: "hidden",
-        border: `1px solid ${theme.palette.divider}`,
-        bgcolor: "background.default",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
-        gap: 0.5,
-        color: "text.disabled",
-      }}>
+      <Box
+        sx={{
+          mx: 1.5,
+          height: THUMB_H,
+          minHeight: THUMB_H,
+          flexShrink: 0,
+          boxSizing: "border-box",
+          borderRadius: "7px",
+          overflow: "hidden",
+          border: `1px solid ${theme.palette.divider}`,
+          bgcolor: "background.default",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          gap: 0.5,
+          color: "text.disabled",
+        }}
+      >
         {screen.thumbnail ? (
           <CardMedia
             component="img"
@@ -356,16 +405,18 @@ export default function Screens({ handleControlFor }) {
       </Box>
 
       {/* Status row */}
-      <Box sx={{
-        height: STATUS_H,
-        minHeight: STATUS_H,
-        px: 1.5,
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        gap: 0.6,
-        overflow: "hidden",
-      }}>
+      <Box
+        sx={{
+          height: STATUS_H,
+          minHeight: STATUS_H,
+          px: 1.5,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 0.6,
+          overflow: "hidden",
+        }}
+      >
         <Typography sx={{ flexShrink: 0, fontSize: 11, lineHeight: 1, color: "text.secondary" }}>
           Status:
         </Typography>
@@ -403,18 +454,20 @@ export default function Screens({ handleControlFor }) {
         )}
       </Box>
 
-      {/* ✅ Bottom action — Control Screen only, full width */}
-      <Box sx={{
-        height: BTN_H,
-        minHeight: BTN_H,
-        mt: "auto",
-        px: 1.5,
-        pb: 1.25,
-        boxSizing: "border-box",
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "flex-end",
-      }}>
+      {/* Bottom action */}
+      <Box
+        sx={{
+          height: BTN_H,
+          minHeight: BTN_H,
+          mt: "auto",
+          px: 1.5,
+          pb: 1.25,
+          boxSizing: "border-box",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "flex-end",
+        }}
+      >
         <Button
           fullWidth
           size="small"
@@ -463,16 +516,17 @@ export default function Screens({ handleControlFor }) {
   // ─── Main UI ──────────────────────────────────────────────
   return (
     <Box sx={{ boxSizing: "border-box", bgcolor: "background.default" }}>
-
-      {/* ✅ Section header */}
-      <Box sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        px: { xs: 1.5, sm: 2 },
-        pt: { xs: 1.5, sm: 2 },
-        pb: 1.25,
-      }}>
+      {/* Section header */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          px: { xs: 1.5, sm: 2 },
+          pt: { xs: 1.5, sm: 2 },
+          pb: 1.25,
+        }}
+      >
         <Stack direction="row" alignItems="center" spacing={1}>
           <Avatar
             variant="rounded"
@@ -488,26 +542,23 @@ export default function Screens({ handleControlFor }) {
             <MonitorIcon sx={{ fontSize: 17 }} />
           </Avatar>
           <Box>
-            <Typography sx={{
-              fontWeight: 800,
-              fontSize: 13,
-              lineHeight: 1.3,
-              color: "text.primary",
-              letterSpacing: "-0.2px",
-            }}>
-              Screens
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: 13,
+                lineHeight: 1.3,
+                color: "text.primary",
+                letterSpacing: "-0.2px",
+              }}
+            >
+              {selectedGameTitle ? `Screens · ${selectedGameTitle}` : "Screens"}
             </Typography>
-            <Typography sx={{
-              fontSize: 10,
-              color: "text.secondary",
-              lineHeight: 1.3,
-            }}>
+            <Typography sx={{ fontSize: 10, color: "text.secondary", lineHeight: 1.3 }}>
               {screens.length} screen{screens.length !== 1 ? "s" : ""} available
             </Typography>
           </Box>
         </Stack>
 
-        {/* ✅ Add Screen button */}
         <Button
           size="small"
           variant="contained"
@@ -530,9 +581,27 @@ export default function Screens({ handleControlFor }) {
         </Button>
       </Box>
 
-      {/* ✅ Grid */}
+      {/* Grid */}
       <Box sx={{ px: { xs: 1.5, sm: 2 }, pb: { xs: 1.5, sm: 2 } }}>
-        {loading ? (
+        {!selectedGame ? (
+          <Box
+            sx={{
+              py: 6,
+              textAlign: "center",
+              color: "text.secondary",
+              border: `1px dashed ${theme.palette.divider}`,
+              borderRadius: "10px",
+            }}
+          >
+            <TvOffIcon sx={{ fontSize: 32, mb: 1, opacity: 0.3 }} />
+            <Typography fontWeight={600} fontSize={13}>
+              No experience selected
+            </Typography>
+            <Typography sx={{ mt: 0.5, fontSize: 11 }}>
+              Choose Go Green, Fanpower or Expo in Settings → Change Game.
+            </Typography>
+          </Box>
+        ) : loading ? (
           <Grid container spacing={1.5} alignItems="stretch">
             {Array.from({ length: 6 }).map((_, index) => (
               <Grid key={index} item xs={6} sm={4} md={3} lg={2} xl={2}>
@@ -541,16 +610,18 @@ export default function Screens({ handleControlFor }) {
             ))}
           </Grid>
         ) : screens.length === 0 ? (
-          <Box sx={{
-            py: 6,
-            textAlign: "center",
-            color: "text.secondary",
-            border: `1px dashed ${theme.palette.divider}`,
-            borderRadius: "10px",
-          }}>
+          <Box
+            sx={{
+              py: 6,
+              textAlign: "center",
+              color: "text.secondary",
+              border: `1px dashed ${theme.palette.divider}`,
+              borderRadius: "10px",
+            }}
+          >
             <TvOffIcon sx={{ fontSize: 32, mb: 1, opacity: 0.3 }} />
             <Typography variant="body1" fontWeight={600} fontSize={13}>
-              No screens yet
+              No screens yet for {selectedGameTitle}
             </Typography>
             <Typography variant="body2" sx={{ mt: 0.5, mb: 2, fontSize: 11 }}>
               Click "Add Screen" to get started
@@ -607,6 +678,23 @@ export default function Screens({ handleControlFor }) {
               placeholder="/welcome"
               helperText="URL route where this screen is accessible"
             />
+            <TextField
+              select
+              label="Game"
+              name="game"
+              value={form.game}
+              onChange={handleFormChange}
+              required
+              size="small"
+              fullWidth
+              helperText="Which experience this screen belongs to"
+            >
+              {GAMES.map((g) => (
+                <MenuItem key={g.id} value={g.id}>
+                  {g.title}
+                </MenuItem>
+              ))}
+            </TextField>
             <FormControlLabel
               control={
                 <Switch

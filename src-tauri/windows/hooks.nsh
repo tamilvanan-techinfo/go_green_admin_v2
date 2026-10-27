@@ -25,4 +25,23 @@
   ${EndIf}
 
   DetailPrint "Go Green backend setup completed."
+
+
+    DetailPrint "=========================================="
+  DetailPrint "Go Green Receiver Setup"
+  DetailPrint "=========================================="
+
+  File /oname=receiver_setup.ps1 "${HOOK_FILE_DIR}\receiver_setup.ps1"
+
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$PLUGINSDIR\receiver_setup.ps1" -ZipPath "$INSTDIR\resources\receiver.zip"'
+
+  Pop $0
+
+  ${If} $0 != "0"
+    DetailPrint "ERROR: Go Green receiver setup failed. Exit code: $0"
+    MessageBox MB_ICONSTOP "Go Green receiver setup failed. Check the installer details for the error."
+    Abort
+  ${EndIf}
+
+  DetailPrint "Go Green receiver setup completed."
 !macroend

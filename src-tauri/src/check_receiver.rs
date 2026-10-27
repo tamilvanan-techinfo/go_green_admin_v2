@@ -4,6 +4,9 @@ use std::sync::Mutex;
 use sysinfo::{ProcessesToUpdate, System};
 use tauri::State;
 
+const RECEIVER_EXE: &str = "electricity_power_monitoring_fe.exe";
+const RECEIVER_ENV_VAR: &str = "GoGreen_RECEIVER_DIR";
+
 pub struct ReceiverState(pub Mutex<Option<Child>>);
 
 impl Default for ReceiverState {
@@ -12,12 +15,43 @@ impl Default for ReceiverState {
     }
 }
 
-// Dev-time hardcoded path. Once bundling is wired up, replace this with
-// a path resolved from the extracted resource directory instead.
-fn get_receiver_exe_path() -> PathBuf {
-    PathBuf::from(
+/// Locate the receiver exe.
+///
+/// Order:
+///  1. Directory from the GoGreen_RECEIVER_DIR env var (set by the installer)
+///  2. Known install locations (works on first launch right after install,
+///     before this process can see the newly created env var)
+///  3. Dev-time path (debug builds only)
+fn get_receiver_exe_path() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    // 1. Env var written by receiver_setup.ps1
+    if let Ok(dir) = std::env::var(RECEIVER_ENV_VAR) {
+        if !dir.trim().is_empty() {
+            candidates.push(PathBuf::from(dir).join(RECEIVER_EXE));
+        }
+    }
+
+    // 2. Fixed install locations used by the installer script
+    candidates.push(
+        PathBuf::from(r"C:\ProgramData\GoGreen\GoGreen_Receiver").join(RECEIVER_EXE),
+    );
+
+    if let Ok(program_files) = std::env::var("ProgramFiles") {
+        candidates.push(
+            PathBuf::from(program_files)
+                .join(r"GoGreen\GoGreen_Receiver")
+                .join(RECEIVER_EXE),
+        );
+    }
+
+    // 3. Dev only
+    #[cfg(debug_assertions)]
+    candidates.push(PathBuf::from(
         r"D:\go green led fe\out\electricity_power_monitoring_fe-win32-x64\electricity_power_monitoring_fe.exe",
-    )
+    ));
+
+    candidates.into_iter().find(|path| path.is_file())
 }
 
 #[tauri::command]
@@ -26,10 +60,12 @@ pub fn is_electron_running() -> bool {
     system.refresh_processes(ProcessesToUpdate::All, true);
 
     system.processes().values().any(|process| {
-        process
-            .name()
-            .to_string_lossy()
-            .eq_ignore_ascii_case("electron.exe")
+        let name = process.name().to_string_lossy();
+
+        // "electron.exe" covers dev runs; the packaged receiver runs
+        // under its own exe name.
+        name.eq_ignore_ascii_case("electron.exe")
+            || name.eq_ignore_ascii_case(RECEIVER_EXE)
     })
 }
 
@@ -50,14 +86,15 @@ pub fn start_receiver(state: State<ReceiverState>) -> Result<serde_json::Value, 
         }));
     }
 
-    let exe_path = get_receiver_exe_path();
-
-    if !exe_path.exists() {
+    let Some(exe_path) = get_receiver_exe_path() else {
         return Ok(serde_json::json!({
             "success": false,
-            "message": format!("Receiver exe not found at {:?}", exe_path)
+            "message": format!(
+                "Receiver not found. Reinstall the app or check the {} environment variable.",
+                RECEIVER_ENV_VAR
+            )
         }));
-    }
+    };
 
     let receiver_dir = exe_path
         .parent()
@@ -102,13 +139,13 @@ pub fn stop_receiver(state: State<ReceiverState>) -> Result<serde_json::Value, S
     {
         let _ = Command::new("taskkill")
             .args(["/pid", &pid.to_string(), "/f", "/t"])
-            .spawn();
+            .status();
     }
 
     #[cfg(not(target_os = "windows"))]
     {
         let mut system = System::new();
-        system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        system.refresh_processes(ProcessesToUpdate::All, true);
         if let Some(process) = system.process(sysinfo::Pid::from_u32(pid)) {
             process.kill();
         }

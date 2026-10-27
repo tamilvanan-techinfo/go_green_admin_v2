@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import MonitorsOverview from "./MonitorsOverview";
 import {
@@ -65,6 +66,7 @@ function ScreenControl() {
     send,
     controlledScreen,
     setControlledScreen,
+    lastPush,
   } = useSocket();
 
   const toast = useToast();
@@ -72,6 +74,9 @@ function ScreenControl() {
   const [screen, setScreen] = useState(null);
   const [settings, setSettings] = useState({ ...initialSettings });
   const [baseline, setBaseline] = useState({ ...initialSettings });
+  const [refreshKey, setRefreshKey] = useState(0);
+
+
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -135,7 +140,16 @@ function ScreenControl() {
 
     setSettings(loadedSettings);
     setBaseline(loadedSettings);
+
+  
   }, [controlledScreen]);
+
+
+  // Reload windows whenever the backend confirms a configuration was saved
+  useEffect(() => {
+    if (!lastPush) return;
+    setRefreshKey((k) => k + 1);
+  }, [lastPush]);
 
   // Load LED receiver status from the Electron main process.
   useEffect(() => {
@@ -240,15 +254,24 @@ function ScreenControl() {
     setSaving(true);
 
     try {
-      send({
+      const sent =send({
         type: "window_update",
         screen_id: screen?.id,
         properties: changedProperties,
       });
 
+      if (!sent) {
+        toast("Socket not open. Settings were not sent.", "error");
+        return; // finally still runs and resets saving
+      }
+
+   
       setBaseline({ ...settings });
 
       toast("Screen settings sent successfully.", "success");
+
+
+      
     } catch (error) {
       console.error("Could not send screen settings:", error);
 
@@ -548,7 +571,7 @@ function ScreenControl() {
 
         {/* Connected monitors + content preview */}
         <Box sx={{ mb: 1.75 }}>
-          <MonitorsOverview />
+          <MonitorsOverview  refreshKey={refreshKey}/>
         </Box>
 
         <Divider sx={{ mb: 2 }} />
