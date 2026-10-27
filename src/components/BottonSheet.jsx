@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Drawer,
@@ -9,6 +8,8 @@ import {
   Slide,
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+
+export const SHEET_Z_INDEX = 99999;
 
 const BottomSheet = ({
   children,
@@ -23,6 +24,7 @@ const BottomSheet = ({
       anchor="bottom"
       open={open}
       onClose={onClose}
+      disableEnforceFocus
       slots={{
         transition: Slide,
       }}
@@ -41,7 +43,7 @@ const BottomSheet = ({
         exit: 350,
       }}
       sx={{
-        zIndex: 99999,
+        zIndex: SHEET_Z_INDEX,
 
         // Center the paper using the Drawer root.
         "& .MuiDrawer-paper": {
@@ -50,7 +52,7 @@ const BottomSheet = ({
           right: 0,
           bottom: 0,
 
-          width:width,
+          width: width,
           maxWidth: "100%",
           height,
           maxHeight: height,

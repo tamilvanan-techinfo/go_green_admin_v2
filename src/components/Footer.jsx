@@ -44,11 +44,7 @@ const NAV_ITEMS = [
     icon: TextFields,
     path: "/cms",
   },
-  {
-    label: "Logs",
-    icon: Description,
-    path: "/logs",
-  },
+
   {
     label: "Manual Scoring",
     icon: GroupsRounded,

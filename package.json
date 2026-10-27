@@ -12,8 +12,9 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^9.4.0",
-    "@mui/material": "^9.4.0",
+    "@mui/icons-material": "^9.5.0",
+    "@mui/material": "^9.5.0",
+    "@mui/x-data-grid": "^9.16.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-fs": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",
@@ -26,7 +27,8 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.18.4",
     "react-select": "^5.10.2",
-    "react-window": "^1.8.11"
+    "react-window": "^1.8.11",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

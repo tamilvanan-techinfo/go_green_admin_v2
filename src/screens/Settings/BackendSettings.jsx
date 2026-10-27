@@ -36,6 +36,7 @@ const BACKENDS = [
     configKey: "dc",
     module: "electricity_monitoring_be.application:application",
     iconLetter: "DC",
+    readControlUrl: "http://localhost:8000/api/update-mode/",
   },
   {
     name: "fastapi",
@@ -45,6 +46,7 @@ const BACKENDS = [
     configKey: "ac",
     module: "local_folder.main:app",
     iconLetter: "AC",
+    readControlUrl: "http://localhost:8000/api/update-mode/",
   },
 ];
 
@@ -64,9 +66,9 @@ const emptyConfig = { port: "", baudRate: 9600, pollInterval: 1 };
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
 const LS_STATUS_KEY = "gg_backend_running_cache";
-const LS_UPTIME_KEY = "gg_backend_uptime"; // { [name]: startedAtMs }
-const LS_LAST_RUN_KEY = "gg_backend_last_run"; // { [name]: durationMs }
-const LS_TODAY_KEY = "gg_backend_today"; // { date, ms: { [name]: runtimeMs } }
+const LS_UPTIME_KEY = "gg_backend_uptime";
+const LS_LAST_RUN_KEY = "gg_backend_last_run";
+const LS_TODAY_KEY = "gg_backend_today";
 
 const lsRead = (key) => {
   try {
@@ -75,6 +77,7 @@ const lsRead = (key) => {
     return {};
   }
 };
+
 const lsWrite = (key, val) => {
   try {
     localStorage.setItem(key, JSON.stringify(val));
@@ -84,24 +87,39 @@ const lsWrite = (key, val) => {
 function readCache() {
   return lsRead(LS_STATUS_KEY);
 }
-function writeCache(s) {
+
+function writeCache(statuses) {
   const slim = {};
-  for (const [k, v] of Object.entries(s)) {
-    slim[k] = { running: v.running, healthy: v.healthy, pid: v.pid };
+
+  for (const [key, value] of Object.entries(statuses)) {
+    slim[key] = {
+      running: value.running,
+      healthy: value.healthy,
+      pid: value.pid,
+    };
   }
+
   lsWrite(LS_STATUS_KEY, slim);
 }
 
 // ─── Time formatters ──────────────────────────────────────────────────────────
 function hmsFromMs(ms) {
   if (!ms || ms <= 0) return "—";
+
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  if (h > 0)
-    return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+
+  if (h > 0) {
+    return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(
+      2,
+      "0"
+    )}s`;
+  }
+
   if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+
   return `${s}s`;
 }
 
@@ -109,24 +127,24 @@ function hmsLive(startedAtMs) {
   return hmsFromMs(startedAtMs ? Date.now() - startedAtMs : 0);
 }
 
-// Short form for the status bar: "2h 05m", "5m", "0m"
 function hmShort(ms) {
   const totalMin = Math.floor((ms || 0) / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
+
   if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+
   return `${m}m`;
 }
 
-// 1 / seconds → "0.5 Hz"
 function formatRate(seconds) {
   const n = Number(seconds);
   if (!n || n <= 0) return "—";
+
   return `${parseFloat((1 / n).toFixed(2))} Hz`;
 }
 
 // ─── useRunningTimer ──────────────────────────────────────────────────────────
-// Per-backend start timestamps (live) and last-run durations (stopped).
 function useRunningTimer(statuses) {
   const [uptimes, setUptimes] = useState(() => lsRead(LS_UPTIME_KEY));
   const [lastRuns, setLastRuns] = useState(() => lsRead(LS_LAST_RUN_KEY));
@@ -134,6 +152,7 @@ function useRunningTimer(statuses) {
   useEffect(() => {
     const nextUp = { ...lsRead(LS_UPTIME_KEY) };
     const nextLR = { ...lsRead(LS_LAST_RUN_KEY) };
+
     let changedUp = false;
     let changedLR = false;
 
@@ -146,6 +165,7 @@ function useRunningTimer(statuses) {
       } else if (!running && nextUp[backend.name]) {
         nextLR[backend.name] = Date.now() - nextUp[backend.name];
         delete nextUp[backend.name];
+
         changedUp = true;
         changedLR = true;
       }
@@ -155,6 +175,7 @@ function useRunningTimer(statuses) {
       lsWrite(LS_UPTIME_KEY, nextUp);
       setUptimes(nextUp);
     }
+
     if (changedLR) {
       lsWrite(LS_LAST_RUN_KEY, nextLR);
       setLastRuns(nextLR);
@@ -162,10 +183,14 @@ function useRunningTimer(statuses) {
   }, [statuses]);
 
   const [, setTick] = useState(0);
+
   useEffect(() => {
     const anyRunning = Object.values(statuses).some((s) => s?.running);
+
     if (!anyRunning) return;
+
     const id = setInterval(() => setTick((t) => t + 1), 1000);
+
     return () => clearInterval(id);
   }, [statuses]);
 
@@ -173,22 +198,24 @@ function useRunningTimer(statuses) {
 }
 
 // ─── useTodayRuntime ──────────────────────────────────────────────────────────
-// Accumulates how long each backend has run TODAY, per backend.
-// Stored under the date, so it resets by itself when the date changes.
 const dayKey = () => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
+
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 function loadToday() {
   const saved = lsRead(LS_TODAY_KEY);
+
   return saved.date === dayKey() ? saved : { date: dayKey(), ms: {} };
 }
 
 function useTodayRuntime(statuses) {
   const [today, setToday] = useState(loadToday);
+
   const statusesRef = useRef(statuses);
   statusesRef.current = statuses;
 
@@ -197,26 +224,30 @@ function useTodayRuntime(statuses) {
 
     const id = setInterval(() => {
       const now = Date.now();
-      // Cap the step so a sleeping laptop doesn't add hours in one tick
       const delta = Math.min(now - last, 5000);
+
       last = now;
 
       setToday((prev) => {
         const key = dayKey();
         const base = prev.date === key ? prev : { date: key, ms: {} };
+
         let changed = base !== prev;
         const ms = { ...base.ms };
 
-        for (const b of BACKENDS) {
-          if (statusesRef.current[b.name]?.running) {
-            ms[b.name] = (ms[b.name] || 0) + delta;
+        for (const backend of BACKENDS) {
+          if (statusesRef.current[backend.name]?.running) {
+            ms[backend.name] = (ms[backend.name] || 0) + delta;
             changed = true;
           }
         }
 
         if (!changed) return prev;
+
         const next = { date: base.date, ms };
+
         lsWrite(LS_TODAY_KEY, next);
+
         return next;
       });
     }, 1000);
@@ -227,7 +258,7 @@ function useTodayRuntime(statuses) {
   return today.ms;
 }
 
-// ─── Shared style blocks ──────────────────────────────────────────────────────
+// ─── Shared styles ────────────────────────────────────────────────────────────
 const buttonSx = {
   height: BTN_H,
   minHeight: BTN_H,
@@ -250,13 +281,26 @@ const fieldLabelSx = {
 };
 
 const TONES = {
-  success: { color: "#047857", bg: "#ECFDF5", border: "#6EE7B7" },
-  warning: { color: "#92400E", bg: "#FEF3C7", border: "#FCD34D" },
-  error: { color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5" },
+  success: {
+    color: "#047857",
+    bg: "#ECFDF5",
+    border: "#6EE7B7",
+  },
+  warning: {
+    color: "#92400E",
+    bg: "#FEF3C7",
+    border: "#FCD34D",
+  },
+  error: {
+    color: "#DC2626",
+    bg: "#FEF2F2",
+    border: "#FCA5A5",
+  },
 };
 
 function StatusChip({ label, tone = "success" }) {
   const t = TONES[tone];
+
   return (
     <Chip
       label={label}
@@ -273,19 +317,30 @@ function StatusChip({ label, tone = "success" }) {
         color: t.color,
         backgroundColor: t.bg,
         border: `1px solid ${t.border}`,
-        "& .MuiChip-label": { px: 1, py: 0, lineHeight: 1 },
+        "& .MuiChip-label": {
+          px: 1,
+          py: 0,
+          lineHeight: 1,
+        },
       }}
     />
   );
 }
 
-// Reference-style stat:  [icon]  Label: value
-function StatPill({ icon, label, children }) {
+function StatPill({ icon, label, children })  {
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 0.75,
+        minWidth: 0,
+      }}
+    >
       <Box sx={{ display: "flex", color: tokens.textLightSecondary }}>
         {icon}
       </Box>
+
       <Typography
         sx={{
           fontFamily: tokens.mono,
@@ -296,6 +351,7 @@ function StatPill({ icon, label, children }) {
       >
         {label}:
       </Typography>
+
       {children}
     </Box>
   );
@@ -329,13 +385,18 @@ function UptimeRow({ running, startedAtMs, lastRunMs, todayMs }) {
   const muted = !running && !lastRunMs;
 
   const label = live ? "Uptime" : "Last run";
+
   const value = live
     ? hmsLive(startedAtMs)
     : lastRunMs
       ? hmsFromMs(lastRunMs)
       : "—";
 
-  const iconColor = live ? tokens.brandAccent : muted ? "#CBD5E1" : "#94A3B8";
+  const iconColor = live
+    ? tokens.brandAccent
+    : muted
+      ? "#CBD5E1"
+      : "#94A3B8";
 
   return (
     <Box
@@ -353,6 +414,7 @@ function UptimeRow({ running, startedAtMs, lastRunMs, todayMs }) {
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <AccessTimeRounded sx={{ fontSize: 15, color: iconColor }} />
+
         <Typography
           sx={{
             fontFamily: tokens.mono,
@@ -367,20 +429,32 @@ function UptimeRow({ running, startedAtMs, lastRunMs, todayMs }) {
         >
           {label}
         </Typography>
+
         <Typography
           sx={{
             fontFamily: tokens.mono,
             fontSize: "0.72rem",
             fontWeight: 700,
             fontVariantNumeric: "tabular-nums",
-            color: live ? tokens.brandAccent : muted ? "#CBD5E1" : "#94A3B8",
+            color: live
+              ? tokens.brandAccent
+              : muted
+                ? "#CBD5E1"
+                : "#94A3B8",
           }}
         >
           {value}
         </Typography>
       </Box>
 
-      <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
+      <Box
+        sx={{
+          ml: "auto",
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+        }}
+      >
         <Typography
           sx={{
             fontFamily: tokens.mono,
@@ -391,6 +465,7 @@ function UptimeRow({ running, startedAtMs, lastRunMs, todayMs }) {
         >
           Today
         </Typography>
+
         <Typography
           sx={{
             fontFamily: tokens.mono,
@@ -407,19 +482,31 @@ function UptimeRow({ running, startedAtMs, lastRunMs, todayMs }) {
   );
 }
 
+// ─── Modbus control helpers ──────────────────────────────────────────────────
+const initialReadControls = {
+  django: { enabled: false, loading: true, saving: false },
+  fastapi: { enabled: false, loading: true, saving: false },
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function BackendSettings() {
   const toast = useToast();
 
   const [statuses, setStatuses] = useState(() => readCache());
+
   const [configs, setConfigs] = useState({
     ac: { ...emptyConfig },
     dc: { ...emptyConfig },
   });
+
   const [ports, setPorts] = useState([]);
   const [pythonMode] = useState("venv");
+
   const [pendingToggle, setPendingToggle] = useState({});
   const [busy, setBusy] = useState({});
+
+  // Independent Modbus read controls for AC and DC.
+  const [readControls, setReadControls] = useState(initialReadControls);
 
   const { uptimes, lastRuns } = useRunningTimer(statuses);
   const todayMs = useTodayRuntime(statuses);
@@ -427,24 +514,29 @@ export default function BackendSettings() {
   const isBusy = Object.values(busy).some(Boolean);
 
   const runAction = async (key, action, successMsg) => {
-    setBusy((p) => ({ ...p, [key]: true }));
+    setBusy((prev) => ({ ...prev, [key]: true }));
+
     try {
       const result = await action();
+
       if (successMsg) toast(successMsg);
+
       return result;
     } catch (e) {
       toast(String(e), "error");
       return null;
     } finally {
-      setBusy((p) => ({ ...p, [key]: false }));
+      setBusy((prev) => ({ ...prev, [key]: false }));
     }
   };
 
   const applyStatuses = useCallback((result) => {
     const next = {};
+
     result.forEach((item) => {
       next[item.name] = item;
     });
+
     setStatuses(next);
     writeCache(next);
   }, []);
@@ -458,6 +550,7 @@ export default function BackendSettings() {
   const loadConfigs = useCallback(async () => {
     try {
       const result = await invoke("get_backend_configs");
+
       setConfigs({
         ac: { ...emptyConfig, ...(result.ac || {}) },
         dc: { ...emptyConfig, ...(result.dc || {}) },
@@ -468,7 +561,9 @@ export default function BackendSettings() {
   const scanPorts = useCallback(async () => {
     try {
       const result = await invoke("scan_serial_ports");
+
       setPorts(result);
+
       toast(
         result.length > 0
           ? `Found ${result.length} serial port${
@@ -476,24 +571,183 @@ export default function BackendSettings() {
             }: ${result.join(", ")}`
           : "No serial ports found."
       );
-    } catch {}
+    } catch (e) {
+      toast(String(e), "error");
+    }
   }, [toast]);
+
+  // ─── Load AC/DC Modbus status ──────────────────────────────────────────────
+  const loadReadControl = useCallback(
+    async (backend) => {
+      setReadControls((prev) => ({
+        ...prev,
+        [backend.name]: {
+          ...prev[backend.name],
+          loading: true,
+        },
+      }));
+
+      try {
+        const response = await fetch(`${backend.readControlUrl}?meter=${backend.short}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `${backend.short} Modbus status request failed (HTTP ${response.status})`
+          );
+        }
+
+        const data = await response.json();
+
+        setReadControls((prev) => ({
+          ...prev,
+          [backend.name]: {
+            ...prev[backend.name],
+            enabled: Boolean(data.mode ?? data.data?.mode ?? data.read_enabled ?? data.data?.read_enabled),
+            loading: false,
+          },
+        }));
+      } catch (e) {
+        console.error(
+          `Failed to load ${backend.short} Modbus status:`,
+          e
+        );
+
+        setReadControls((prev) => ({
+          ...prev,
+          [backend.name]: {
+            ...prev[backend.name],
+            loading: false,
+          },
+        }));
+
+        toast(`Unable to load ${backend.short} Modbus status.`, "error");
+      }
+    },
+    [toast]
+  );
+
+  // ─── AC/DC Modbus toggle ──────────────────────────────────────────────────
+  const handleReadControlToggle = useCallback(
+    async (backend, nextEnabled) => {
+      const isRunning = Boolean(statuses[backend.name]?.running);
+
+      if (!isRunning) {
+        toast(
+          `Start the ${backend.short} Meter Backend before enabling Modbus reading.`,
+          "error"
+        );
+        return;
+      }
+
+      setReadControls((prev) => ({
+        ...prev,
+        [backend.name]: {
+          ...prev[backend.name],
+          saving: true,
+        },
+      }));
+
+      try {
+        const response = await fetch(backend.readControlUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            meter: backend.short,
+            mode: nextEnabled,
+          }),
+        });
+
+        if (!response.ok) {
+          let errorMessage = `${backend.short} Modbus request failed (HTTP ${response.status})`;
+
+          try {
+            const errorData = await response.json();
+            if (errorData.detail) errorMessage = errorData.detail;
+            if (errorData.error) errorMessage = errorData.error;
+          } catch {}
+
+          throw new Error(errorMessage);
+        }
+
+        let data = {};
+
+        try {
+          data = await response.json();
+        } catch {}
+
+        setReadControls((prev) => ({
+          ...prev,
+          [backend.name]: {
+            ...prev[backend.name],
+            enabled:
+              typeof (data.mode ?? data.data?.mode ?? data.read_enabled ?? data.data?.read_enabled) === "boolean"
+                ? (data.mode ?? data.data?.mode ?? data.read_enabled ?? data.data?.read_enabled)
+                : nextEnabled,
+          },
+        }));
+
+        toast(
+          `${backend.short} Modbus reading ${
+            nextEnabled ? "enabled" : "disabled"
+          }.`
+        );
+      } catch (e) {
+        console.error(
+          `Failed to update ${backend.short} Modbus status:`,
+          e
+        );
+        toast(String(e), "error");
+      } finally {
+        setReadControls((prev) => ({
+          ...prev,
+          [backend.name]: {
+            ...prev[backend.name],
+            saving: false,
+          },
+        }));
+      }
+    },
+    [statuses, toast]
+  );
 
   useEffect(() => {
     refreshStatuses();
     loadConfigs();
     scanPorts();
-    const t = setInterval(refreshStatuses, 3000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshStatuses, loadConfigs]);
+
+    BACKENDS.forEach((backend => {
+      loadReadControl(backend);
+    }));
+
+    const timer = setInterval(refreshStatuses, 3000);
+
+    return () => clearInterval(timer);
+  }, [refreshStatuses, loadConfigs, loadReadControl, scanPorts]);
 
   const updateConfig = (key, field, value) =>
-    setConfigs((p) => ({ ...p, [key]: { ...p[key], [field]: value } }));
+    setConfigs((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: value,
+      },
+    }));
 
+  // ─── Start / stop backend ──────────────────────────────────────────────────
   const toggleDaemon = async (backend) => {
     const currentlyRunning = Boolean(statuses[backend.name]?.running);
-    setPendingToggle((p) => ({ ...p, [backend.name]: true }));
+
+    setPendingToggle((prev) => ({
+      ...prev,
+      [backend.name]: true,
+    }));
+
     setStatuses((prev) => {
       const next = {
         ...prev,
@@ -503,36 +757,82 @@ export default function BackendSettings() {
           healthy: false,
         },
       };
+
       writeCache(next);
       return next;
     });
+
     try {
       if (currentlyRunning) {
+        // Disable this backend's Modbus polling before stopping it.
+        const readState = readControls[backend.name];
+
+        if (readState?.enabled) {
+          try {
+            const response = await fetch(backend.readControlUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({ meter: backend.short, mode: false }),
+            });
+
+            if (!response.ok) {
+              throw new Error(
+                `Unable to disable ${backend.short} Modbus reading (HTTP ${response.status})`
+              );
+            }
+
+            setReadControls((prev) => ({
+              ...prev,
+              [backend.name]: {
+                ...prev[backend.name],
+                enabled: false,
+              },
+            }));
+          } catch (e) {
+            toast(
+              `Could not disable ${backend.short} Modbus reading: ${String(e)}`,
+              "error"
+            );
+          }
+        }
+
         await invoke("stop_backend", { name: backend.name });
+
         toast(`${backend.title} stopped.`);
       } else {
         await invoke("save_backend_configs", { configs });
-        toast(`${backend.title} starting… health check will update shortly.`);
-        invoke("start_backend", { name: backend.name, pythonMode }).catch(
-          (e) => {
-            toast(`Failed to start ${backend.title}: ${String(e)}`, "error");
-            setStatuses((prev) => {
-              const next = {
-                ...prev,
-                [backend.name]: {
-                  ...(prev[backend.name] || {}),
-                  running: false,
-                  healthy: false,
-                },
-              };
-              writeCache(next);
-              return next;
-            });
-          }
+
+        toast(
+          `${backend.title} starting… health check will update shortly.`
         );
+
+        invoke("start_backend", {
+          name: backend.name,
+          pythonMode,
+        }).catch((e) => {
+          toast(`Failed to start ${backend.title}: ${String(e)}`, "error");
+
+          setStatuses((prev) => {
+            const next = {
+              ...prev,
+              [backend.name]: {
+                ...(prev[backend.name] || {}),
+                running: false,
+                healthy: false,
+              },
+            };
+
+            writeCache(next);
+            return next;
+          });
+        });
       }
     } catch (e) {
       toast(`Backend action failed: ${String(e)}`, "error");
+
       setStatuses((prev) => {
         const next = {
           ...prev,
@@ -541,11 +841,16 @@ export default function BackendSettings() {
             running: currentlyRunning,
           },
         };
+
         writeCache(next);
         return next;
       });
     } finally {
-      setPendingToggle((p) => ({ ...p, [backend.name]: false }));
+      setPendingToggle((prev) => ({
+        ...prev,
+        [backend.name]: false,
+      }));
+
       setTimeout(refreshStatuses, 800);
     }
   };
@@ -554,9 +859,39 @@ export default function BackendSettings() {
     runAction(
       backend.name,
       async () => {
+        // Disable the selected backend's Modbus polling before restart.
+        if (readControls[backend.name]?.enabled) {
+          const response = await fetch(backend.readControlUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({ meter: backend.short, mode: false }),
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Unable to disable ${backend.short} Modbus reading before restart.`
+            );
+          }
+
+          setReadControls((prev) => ({
+            ...prev,
+            [backend.name]: {
+              ...prev[backend.name],
+              enabled: false,
+            },
+          }));
+        }
+
         await invoke("save_backend_configs", { configs });
         await invoke("stop_backend", { name: backend.name });
-        return invoke("start_backend", { name: backend.name, pythonMode });
+
+        return invoke("start_backend", {
+          name: backend.name,
+          pythonMode,
+        });
       },
       `${backend.title} restarting…`
     ).then(refreshStatuses);
@@ -566,17 +901,54 @@ export default function BackendSettings() {
       "all",
       async () => {
         await invoke("save_backend_configs", { configs });
-        for (const b of BACKENDS) await invoke("stop_backend", { name: b.name });
+
+        // Disable AC and DC Modbus polling independently.
+        for (const backend of BACKENDS) {
+          if (readControls[backend.name]?.enabled) {
+            const response = await fetch(backend.readControlUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({ meter: backend.short, mode: false }),
+            });
+
+            if (!response.ok) {
+              throw new Error(
+                `Unable to disable ${backend.short} Modbus reading before restart.`
+              );
+            }
+
+            setReadControls((prev) => ({
+              ...prev,
+              [backend.name]: {
+                ...prev[backend.name],
+                enabled: false,
+              },
+            }));
+          }
+        }
+
+        for (const backend of BACKENDS) {
+          await invoke("stop_backend", { name: backend.name });
+        }
+
         await Promise.all(
-          BACKENDS.map((b) =>
-            invoke("start_backend", { name: b.name, pythonMode })
+          BACKENDS.map((backend) =>
+            invoke("start_backend", {
+              name: backend.name,
+              pythonMode,
+            })
           )
         );
       },
       "All backends restarting…"
     ).then(refreshStatuses);
 
-  const pingAll = () => runAction("ping", refreshStatuses, "Status refreshed.");
+  const pingAll = () =>
+    runAction("ping", refreshStatuses, "Status refreshed.");
+
   const openTerminal = (name) =>
     runAction(
       `term_${name}`,
@@ -584,9 +956,12 @@ export default function BackendSettings() {
       "Terminal opened."
     );
 
-  const totalHealthy = Object.values(statuses).filter((s) => s.healthy).length;
+  const totalHealthy = Object.values(statuses).filter(
+    (status) => status.healthy
+  ).length;
+
   const combinedTodayMs = BACKENDS.reduce(
-    (sum, b) => sum + (todayMs[b.name] || 0),
+    (sum, backend) => sum + (todayMs[backend.name] || 0),
     0
   );
 
@@ -612,7 +987,7 @@ export default function BackendSettings() {
         </Typography>
       </Box>
 
-      {/* Status bar (taller, reference-style stats) */}
+      {/* Status bar */}
       <Box
         sx={{
           ...studioSx.card,
@@ -637,9 +1012,11 @@ export default function BackendSettings() {
               flexShrink: 0,
             }}
           />
+
           <Typography sx={{ ...studioSx.cardTitle, fontSize: "0.88rem" }}>
             Modbus RTU Master Engine
           </Typography>
+
           <StatusChip
             label={`${totalHealthy} Active Pipeline${
               totalHealthy !== 1 ? "s" : ""
@@ -649,20 +1026,39 @@ export default function BackendSettings() {
 
         <VDivider />
 
-        <StatPill icon={<SyncAltRounded sx={{ fontSize: 16 }} />} label="Runtime Today">
+        <StatPill
+          icon={<SyncAltRounded sx={{ fontSize: 16 }} />}
+          label="Runtime Today"
+        >
           <Typography sx={statValueSx}>{hmShort(combinedTodayMs)}</Typography>
         </StatPill>
 
         <VDivider />
 
-        <StatPill icon={<SwapHorizRounded sx={{ fontSize: 16 }} />} label="By Server">
-          {BACKENDS.map((b, i) => (
-            <Box key={b.name} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              {i > 0 && (
-                <Typography sx={{ ...statValueSx, color: tokens.textLightSecondary }}>
+        <StatPill
+          icon={<SwapHorizRounded sx={{ fontSize: 16 }} />}
+          label="By Server"
+        >
+          {BACKENDS.map((backend, index) => (
+            <Box
+              key={backend.name}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              {index > 0 && (
+                <Typography
+                  sx={{
+                    ...statValueSx,
+                    color: tokens.textLightSecondary,
+                  }}
+                >
                   ·
                 </Typography>
               )}
+
               <Typography
                 sx={{
                   fontFamily: tokens.mono,
@@ -670,9 +1066,12 @@ export default function BackendSettings() {
                   color: tokens.textLightSecondary,
                 }}
               >
-                {b.short}
+                {backend.short}
               </Typography>
-              <Typography sx={statValueSx}>{hmShort(todayMs[b.name])}</Typography>
+
+              <Typography sx={statValueSx}>
+                {hmShort(todayMs[backend.name])}
+              </Typography>
             </Box>
           ))}
         </StatPill>
@@ -707,7 +1106,7 @@ export default function BackendSettings() {
         </Box>
       </Box>
 
-      {/* Cards */}
+      {/* Backend cards */}
       <Box
         sx={{
           display: "grid",
@@ -722,6 +1121,12 @@ export default function BackendSettings() {
         {BACKENDS.map((backend) => {
           const status = statuses[backend.name];
           const config = configs[backend.configKey];
+          const readControl = readControls[backend.name] || {
+            enabled: false,
+            loading: true,
+            saving: false,
+          };
+
           const running = Boolean(status?.running);
           const healthy = Boolean(status?.healthy);
           const pending = Boolean(pendingToggle[backend.name]);
@@ -731,7 +1136,11 @@ export default function BackendSettings() {
           return (
             <Box
               key={backend.name}
-              sx={{ ...studioSx.card, overflow: "hidden", minWidth: 0 }}
+              sx={{
+                ...studioSx.card,
+                overflow: "hidden",
+                minWidth: 0,
+              }}
             >
               {/* Header */}
               <Box
@@ -782,6 +1191,7 @@ export default function BackendSettings() {
                       {running && healthy && (
                         <StatusChip label="Active / Connected" tone="success" />
                       )}
+
                       {running && !healthy && (
                         <StatusChip label="Active / Starting" tone="warning" />
                       )}
@@ -795,7 +1205,8 @@ export default function BackendSettings() {
                         mt: 0.5,
                       }}
                     >
-                      {pid ? `Daemon PID: ${pid} · ` : ""}Port {backend.port}
+                      {pid ? `Daemon PID: ${pid} · ` : ""}
+                      Port {backend.port}
                     </Typography>
                   </Box>
                 </Box>
@@ -809,11 +1220,14 @@ export default function BackendSettings() {
                   }}
                 >
                   <Typography sx={studioSx.secondaryText}>Daemon</Typography>
+
                   <Switch
                     checked={running}
                     disabled={pending}
                     onChange={() => toggleDaemon(backend)}
-                    inputProps={{ "aria-label": `${backend.title} daemon` }}
+                    inputProps={{
+                      "aria-label": `${backend.title} daemon`,
+                    }}
                   />
                 </Box>
               </Box>
@@ -827,6 +1241,81 @@ export default function BackendSettings() {
                 lastRunMs={lastRuns[backend.name]}
                 todayMs={todayMs[backend.name]}
               />
+
+              {/* Independent Modbus controls for AC and DC */}
+              <Divider />
+
+              <Box
+                sx={{
+                  px: 2.5,
+                  py: 1.5,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1.5,
+                  bgcolor: readControl.enabled ? "#F0FDF4" : tokens.surface,
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "0.82rem",
+                      color: tokens.ink,
+                    }}
+                  >
+                    {backend.short} Modbus Reading
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      ...studioSx.secondaryText,
+                      fontSize: "0.7rem",
+                      mt: 0.25,
+                    }}
+                  >
+                    {readControl.loading
+                      ? "Loading read status…"
+                      : readControl.saving
+                        ? "Updating Modbus reading…"
+                        : readControl.enabled
+                          ? `${backend.short} polling is enabled`
+                          : `${backend.short} polling is disabled`}
+                  </Typography>
+                </Box>
+
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  {!readControl.loading && (
+                    <StatusChip
+                      label={readControl.enabled ? "ON" : "OFF"}
+                      tone={readControl.enabled ? "success" : "warning"}
+                    />
+                  )}
+
+                  <Switch
+                    checked={readControl.enabled}
+                    disabled={
+                      readControl.loading ||
+                      readControl.saving ||
+                      !running ||
+                      pending
+                    }
+                    onChange={(event) =>
+                      handleReadControlToggle(backend, event.target.checked)
+                    }
+                    inputProps={{
+                      "aria-label": `${backend.short} Modbus reading`,
+                    }}
+                  />
+                </Box>
+              </Box>
 
               {/* Body */}
               <Box
@@ -849,7 +1338,9 @@ export default function BackendSettings() {
                       mb: 0.75,
                     }}
                   >
-                    <Typography sx={fieldLabelSx}>Serial / COM Port</Typography>
+                    <Typography sx={fieldLabelSx}>
+                      Serial / COM Port
+                    </Typography>
 
                     <Button
                       onClick={scanPorts}
@@ -861,25 +1352,44 @@ export default function BackendSettings() {
                         fontFamily: tokens.mono,
                         fontSize: "0.65rem",
                         color: tokens.brandAccent,
-                        "&:hover": { bgcolor: "transparent", opacity: 0.8 },
+                        "&:hover": {
+                          bgcolor: "transparent",
+                          opacity: 0.8,
+                        },
                       }}
                     >
                       ↺ Scan Ports
                     </Button>
                   </Box>
 
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
                     <TextField
                       select
                       fullWidth
                       size="small"
                       value={config.port}
-                      onChange={(e) =>
-                        updateConfig(backend.configKey, "port", e.target.value)
+                      onChange={(event) =>
+                        updateConfig(
+                          backend.configKey,
+                          "port",
+                          event.target.value
+                        )
                       }
-                      slotProps={{ select: { displayEmpty: true } }}
+                      slotProps={{
+                        select: {
+                          displayEmpty: true,
+                        },
+                      }}
                     >
-                      <MenuItem value="">— Select COM port —</MenuItem>
+                      <MenuItem value="">
+                        — Select COM port —
+                      </MenuItem>
 
                       {config.port && !ports.includes(config.port) && (
                         <MenuItem value={config.port}>
@@ -887,9 +1397,9 @@ export default function BackendSettings() {
                         </MenuItem>
                       )}
 
-                      {ports.map((p) => (
-                        <MenuItem key={p} value={p}>
-                          {p}
+                      {ports.map((port) => (
+                        <MenuItem key={port} value={port}>
+                          {port}
                         </MenuItem>
                       ))}
                     </TextField>
@@ -898,7 +1408,11 @@ export default function BackendSettings() {
                       variant="outlined"
                       startIcon={<SearchRounded sx={{ fontSize: 16 }} />}
                       onClick={scanPorts}
-                      sx={{ ...buttonSx, height: 38, minHeight: 38 }}
+                      sx={{
+                        ...buttonSx,
+                        height: 38,
+                        minHeight: 38,
+                      }}
                     >
                       Detect
                     </Button>
@@ -916,17 +1430,17 @@ export default function BackendSettings() {
                     fullWidth
                     size="small"
                     value={Number(config.baudRate)}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       updateConfig(
                         backend.configKey,
                         "baudRate",
-                        Number(e.target.value)
+                        Number(event.target.value)
                       )
                     }
                   >
-                    {BAUD_RATES.map((r) => (
-                      <MenuItem key={r.value} value={r.value}>
-                        {r.label}
+                    {BAUD_RATES.map((rate) => (
+                      <MenuItem key={rate.value} value={rate.value}>
+                        {rate.label}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -943,11 +1457,23 @@ export default function BackendSettings() {
                       mb: 0.75,
                     }}
                   >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.75,
+                      }}
+                    >
                       <TimerOutlined
-                        sx={{ fontSize: 15, color: tokens.textLightSecondary }}
+                        sx={{
+                          fontSize: 15,
+                          color: tokens.textLightSecondary,
+                        }}
                       />
-                      <Typography sx={fieldLabelSx}>Polling Interval</Typography>
+
+                      <Typography sx={fieldLabelSx}>
+                        Polling Interval
+                      </Typography>
                     </Box>
 
                     <Typography
@@ -978,17 +1504,24 @@ export default function BackendSettings() {
                       type="number"
                       size="small"
                       value={config.pollInterval}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         updateConfig(
                           backend.configKey,
                           "pollInterval",
-                          e.target.value === ""
+                          event.target.value === ""
                             ? ""
-                            : Math.max(1, parseInt(e.target.value, 10) || 1)
+                            : Math.max(
+                                1,
+                                parseInt(event.target.value, 10) || 1
+                              )
                         )
                       }
                       slotProps={{
-                        htmlInput: { min: 1, max: 3600, step: 1 },
+                        htmlInput: {
+                          min: 1,
+                          max: 3600,
+                          step: 1,
+                        },
                         input: {
                           endAdornment: (
                             <InputAdornment position="end">
@@ -1015,14 +1548,26 @@ export default function BackendSettings() {
                       }}
                     />
 
-                    <Box sx={{ display: "flex", gap: 0.75, flexShrink: 0 }}>
-                      {POLL_PRESETS_S.map((p) => {
-                        const active = Number(config.pollInterval) === p;
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 0.75,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {POLL_PRESETS_S.map((preset) => {
+                        const active =
+                          Number(config.pollInterval) === preset;
+
                         return (
                           <Button
-                            key={p}
+                            key={preset}
                             onClick={() =>
-                              updateConfig(backend.configKey, "pollInterval", p)
+                              updateConfig(
+                                backend.configKey,
+                                "pollInterval",
+                                preset
+                              )
                             }
                             sx={{
                               height: 38,
@@ -1040,11 +1585,13 @@ export default function BackendSettings() {
                               color: active ? "#fff" : tokens.ink,
                               bgcolor: active ? tokens.brand : "#F1F5F9",
                               "&:hover": {
-                                bgcolor: active ? tokens.brandHover : "#E2E8F0",
+                                bgcolor: active
+                                  ? tokens.brandHover
+                                  : "#E2E8F0",
                               },
                             }}
                           >
-                            {p}s
+                            {preset}s
                           </Button>
                         );
                       })}
