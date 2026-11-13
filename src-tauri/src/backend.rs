@@ -13,8 +13,9 @@ use std::os::windows::process::CommandExt;
 use crate::{
     discovery::{discover_backend_root, log_path, python_executable},
     process::{
-        http_responds, load_state, process_matches_backend, save_state, ManagedProcess,
-        CREATE_NO_WINDOW,
+        find_running_python_processes,
+        http_responds, load_state, process_matches_backend, save_state,
+        ManagedProcess, CREATE_NO_WINDOW,
     },
 };
 
@@ -54,23 +55,47 @@ pub fn start_backend(
     let mut state = load_state(&app)?;
 
     // Reconnect to an existing process instead of creating a duplicate.
-    if let Some(existing) = state.get(&name) {
-        if process_matches_backend(existing.pid, &name) {
-            return Ok(BackendStatus {
-                name,
-                port,
-                pid: Some(existing.pid),
-                running: true,
-                healthy: http_responds(port),
-                log_file: log_path(&app, key)?.display().to_string(),
-            });
-        }
+    // 1. Scan the live process table by command line, independent of state.
+    let existing_pids = find_running_python_processes(module);
+
+    if existing_pids.len() > 1 {
+        return Err(format!(
+            "Found multiple {name} backends already running (PIDs: {existing_pids:?}). \
+             Stop them manually before starting again."
+        ));
     }
 
-    // Never start a second server on a port owned by another process.
+    if let Some(&pid) = existing_pids.first() {
+        // Reconcile state with reality so future cycles don't try to spawn another.
+        let pid_matches_state = state.get(&name).map(|p| p.pid) == Some(pid);
+        if !pid_matches_state {
+            let root = discover_backend_root()?;
+            state.insert(
+                name.clone(),
+                ManagedProcess {
+                    pid,
+                    project_dir: root.display().to_string(),
+                    python_mode,
+                },
+            );
+            save_state(&app, &state)?;
+        }
+
+        return Ok(BackendStatus {
+            name,
+            port,
+            pid: Some(pid),
+            running: true,
+            healthy: http_responds(port),
+            log_file: log_path(&app, key)?.display().to_string(),
+        });
+    }
+
+    // 2. Port might still be held by a non-backend program.
     if http_responds(port) {
         return Err(format!(
-            "Port {port} is already responding, but this app cannot verify that it owns that process. Stop the existing server or free the port first."
+            "Port {port} is responding, but no {name} backend process was found. \
+             Another program may be using this port."
         ));
     }
 
@@ -85,6 +110,7 @@ pub fn start_backend(
     let mut command = Command::new(&python);
     command
         .current_dir(&root)
+        .env("PYTHONIOENCODING", "utf-8")
         .arg("-m")
         .arg("uvicorn")
         .arg(module)

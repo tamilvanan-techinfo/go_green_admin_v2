@@ -141,3 +141,36 @@ pub fn http_responds(port: u16) -> bool {
 
     first_line.starts_with("HTTP/1.")
 }
+
+
+/// Return PIDs of all Python processes whose command line contains `needle`.
+/// State-file independent; safe to call before you trust `load_state`.
+#[cfg(windows)]
+pub fn find_running_python_processes(needle: &str) -> Vec<u32> {
+    let escaped = needle.replace('\'', "''");
+
+    let script = format!(
+        "Get-CimInstance Win32_Process | \
+         Where-Object {{ $_.Name -match '^python' -and \
+                        $_.CommandLine -like '*{escaped}*' }} | \
+         Select-Object -ExpandProperty ProcessId"
+    );
+
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+
+    match output {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter_map(|l| l.trim().parse::<u32>().ok())
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+#[cfg(not(windows))]
+pub fn find_running_python_processes(_needle: &str) -> Vec<u32> {
+    Vec::new()
+}

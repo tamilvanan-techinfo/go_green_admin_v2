@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { Box } from "@mui/material";
+import { invoke } from "@tauri-apps/api/core";
 
 import AppLayout from "../../components/AppLayout";
 import AddScreen from "./AddScreen";
@@ -31,6 +32,7 @@ const thinScrollbar = {
 
 function ScreenManager() {
   const [controlFor, setControlFor] = useState("");
+  const [selectedGame, setSelectedGame] = useState(null);
 
   const changeControl = useCallback((value) => {
     setControlFor(value);
@@ -38,6 +40,15 @@ function ScreenManager() {
 
   const closeControl = useCallback(() => {
     setControlFor("");
+  }, []);
+
+  useEffect(() => {
+    invoke("get_selected_experience")
+      .then(setSelectedGame)
+      .catch((error) => {
+        console.error("Failed to get selected experience:", error);
+        setSelectedGame(null);
+      });
   }, []);
 
   return (
@@ -73,15 +84,17 @@ function ScreenManager() {
             sx={{
               width: "100%",
               minWidth: 0,
+              minHeight:0,
               maxWidth: "100%",
               boxSizing: "border-box",
               overflowX: "hidden",
               overflowY: "auto",
+              height : "100%",
               maxHeight: "calc(100vh - 100px)",
               ...thinScrollbar,
             }}
           >
-            <Screens handleControlFor={changeControl} />
+            <Screens handleControlFor={changeControl} selectedGame={selectedGame} />
           </Box>
 
           {/* COLUMN 2 (high priority): Screen Windows */}
@@ -89,12 +102,16 @@ function ScreenManager() {
             sx={{
               width: "100%",
               minWidth: 0,
+              minHeight: 0,
+              height: "100%",
+              overflowX:"hidden",
+              overflowY: "auto",
               maxWidth: "100%",
               boxSizing: "border-box",
               overflow: "hidden",
             }}
           >
-            <ScreenWindows />
+            <ScreenWindows selectedGame={selectedGame} />
           </Box>
 
           {/* COLUMN 3: AddScreen + ScreenControl */}
@@ -106,6 +123,10 @@ function ScreenManager() {
               gap: { xs: 1.5, md: 2 },
               width: "100%",
               minWidth: 0,
+              minHeight: 0,
+              height:"100%",
+              overflowX:"hidden",
+              overflowY:"auto",
               maxWidth: "100%",
               boxSizing: "border-box",
               "& > *": {

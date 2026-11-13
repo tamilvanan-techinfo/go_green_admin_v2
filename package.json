@@ -22,6 +22,7 @@
     "driver.js": "^1.9.0",
     "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.6",
+    "framer-motion": "^14.6.0",
     "material-symbols": "^0.47.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

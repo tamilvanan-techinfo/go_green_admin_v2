@@ -17,6 +17,7 @@ import AppLayout from '../../components/AppLayout';
 import MonitorACMeter from './MonitorACMeter';
 import BackendSettings from "./BackendSettings";
 import GameChange from "./GameChange";
+import StartNewMatch from "./StartNewMatch";
 
 import {
   Box, Stack, Typography, Paper, Chip,
@@ -157,10 +158,8 @@ const SETTING_TABS = [
     key: 'acmeter',
     icon: 'offline_bolt',
     label: 'Monitor AC Meter',
-    
-
-   
   },
+ 
 
 ];
 
@@ -185,21 +184,24 @@ function SettingsTabBar({ active, onChange }) {
   return (
     <Box
       sx={{
-        display: "grid",
-        gridTemplateColumns: {
-          xs: "repeat(2, minmax(0, 1fr))",
-          sm: "repeat(2, minmax(0, 1fr))",
-          lg: "repeat(4, minmax(0, 1fr))",
-        },
-        gap: { xs: 1, sm: 1.25 },
-        p: { xs: 0.75, sm: 1 },
-        mb: { xs: 2.5, sm: 3 },
-        bgcolor: "#F4F6FF",
-        border: "1px solid #D9DEEE",
-        borderRadius: { xs: "12px", sm: "16px" },
-        width: "100%",
-        boxSizing: "border-box",
-      }}
+  display: "grid",
+  // was hardcoded to 4 columns at every width, which squeezed all
+  // four tabs (icon + label + description) into tiny columns on
+  // narrow screens with nothing to scroll — now it stacks 2-up on
+  // phones/small tablets and only goes 4-up once there's room
+  gridTemplateColumns: {
+    xs: "repeat(2, minmax(0, 1fr))",
+    md: "repeat(4, minmax(0, 1fr))",
+  },
+  gap: { xs: 0.5, md: 0.75, lg: 1, xl: 1.25 },
+  p: { xs: 0.5, md: 0.75, lg: 1 },
+  mb: { xs: 1.5, md: 2, lg: 2.5 },
+  bgcolor: "#F4F6FF",
+  border: "1px solid #D9DEEE",
+  borderRadius: "12px",
+  width: "100%",
+  boxSizing: "border-box",
+}}
     >
       {SETTING_TABS.map((tab) => {
         const isActive = active === tab.key;
@@ -340,29 +342,12 @@ function SettingsTabBar({ active, onChange }) {
               >
                 {tab.key === "acmeter" && "Live meter monitoring"}
                 {tab.key === "changegame" && "Game mode selection"}
-                {tab.key === "newmatch" && "Match configuration"}
+                {tab.key === "newmatch" && "Start a new DB"}
                 {tab.key === "backend" && "Server connections"}
               </Typography>
             </Box>
 
-            {/* Animated active indicator */}
-            <Box
-              sx={{
-                width: 4,
-                alignSelf: "stretch",
-                flexShrink: 0,
-                borderRadius: 99,
-                bgcolor: "#047857",
-                opacity: isActive ? 1 : 0,
-                transform: isActive ? "scaleY(1)" : "scaleY(0.35)",
-                transformOrigin: "center",
-                transition: [
-                  "opacity 220ms ease",
-                  "transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-                ].join(", "),
-                display: { xs: "none", sm: "block" },
-              }}
-            />
+     
           </Box>
         );
       })}
@@ -388,190 +373,6 @@ const LANES = [
   { id: 'L3', name: 'Marcus T. (Sustainability)',  ftp: '310W', status: 'Assigned' },
   { id: 'L4', name: 'Open Station (Guest Rider)',  ftp: null,   status: 'empty' },
 ];
-
-function StartNewMatchTab({ onToast }) {
-  const [matchType, setMatchType] = useState('sprint');
-  const [countdown, setCountdown] = useState('10');
-  const [sound, setSound] = useState(true);
-  const [hud, setHud]     = useState(true);
-
-  return (
-    <Stack gap={3}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 3 }}>
-        {/* Left: config */}
-        <Stack gap={3}>
-          <SCard sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <CardTitle
-              title="Match Staging & Format Orchestration"
-              subtitle="Configure session boundaries, telemetry triggers, and spectator overlays"
-            />
-
-            {/* Race type */}
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: C.textPrimary, display: 'block', mb: 1 }}>
-                Race Discipline / Mode
-              </Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
-                {MATCH_TYPES.map((m) => {
-                  const active = matchType === m.value;
-                  return (
-                    <Box
-                      key={m.value}
-                      onClick={() => setMatchType(m.value)}
-                      sx={{
-                        p: 1.5, borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
-                        bgcolor: active ? C.primaryLighter : C.bg,
-                        border: `1px solid ${active ? C.primary : C.borderLight}`,
-                        color: active ? C.primary : C.textSecondary,
-                        transition: 'all 0.15s',
-                        '&:hover': { bgcolor: active ? C.primaryLighter : C.surfaceGreen },
-                      }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 20, display: 'block', marginBottom: 4, color: 'inherit' }}>
-                        {m.icon}
-                      </span>
-                      <Typography sx={{ fontSize: '12px', fontWeight: 700, color: 'inherit', lineHeight: 1.2 }}>{m.label}</Typography>
-                      <MonoText sx={{ fontSize: '10px', color: 'inherit', opacity: 0.7, mt: 0.25 }}>{m.sub}</MonoText>
-                    </Box>
-                  );
-                })}
-              </Box>
-            </Box>
-
-            {/* Countdown + leaderboard */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
-              <Box>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: C.textPrimary, display: 'block', mb: 1 }}>
-                  Countdown Delay
-                </Typography>
-                <Stack direction="row" gap={1}>
-                  {[['5', '5 sec (Fast)'], ['10', '10 sec (Std.)']].map(([v, l]) => (
-                    <Box
-                      key={v}
-                      onClick={() => setCountdown(v)}
-                      sx={{
-                        flex: 1, py: 1.125, borderRadius: '8px', cursor: 'pointer', textAlign: 'center',
-                        bgcolor: countdown === v ? C.primary : C.bg,
-                        color: countdown === v ? '#fff' : C.textSecondary,
-                        border: `1px solid ${countdown === v ? C.primary : C.borderLight}`,
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      <MonoText sx={{ fontSize: '11px', color: 'inherit' }}>{l}</MonoText>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Leaderboard Persistence</InputLabel>
-                <Select defaultValue="corporate" label="Leaderboard Persistence">
-                  <MenuItem value="corporate">Corporate Annual Championship 2025</MenuItem>
-                  <MenuItem value="daily">Daily Sprint Leaderboard</MenuItem>
-                  <MenuItem value="exhibition">Exhibition Mode (No Global Score)</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
-            {/* Toggles */}
-            <Divider />
-            <Stack gap={2}>
-              {[
-                { key: 'sound', val: sound, set: setSound, label: 'Arena Sound FX & Starter Horn', sub: 'Triggers 3-2-1 tone sequence to velodrome PA system' },
-                { key: 'hud',   val: hud,   set: setHud,   label: 'Broadcast HUD Graphics',        sub: 'Output live telemetry bars to HDMI Overlays 1 & 2' },
-              ].map((row) => (
-                <Stack key={row.key} direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-                  <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: C.textPrimary, fontSize: '13px', display: 'block' }}>{row.label}</Typography>
-                    <Typography variant="body2" sx={{ color: C.textSecondary }}>{row.sub}</Typography>
-                  </Box>
-                  <Switch checked={row.val} onChange={e => row.set(e.target.checked)} />
-                </Stack>
-              ))}
-            </Stack>
-          </SCard>
-
-          {/* Launch CTA */}
-          <SCard sx={{ py: 2 }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" gap={2}>
-              <Box>
-                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: C.textPrimary }}>
-                  Pre-Race Verification Passed
-                </Typography>
-                <MonoText sx={{ fontSize: '11px', color: C.success }}>
-                  All 4 Bike Stations Latency &lt; 8ms · AC Inverters Armed
-                </MonoText>
-              </Box>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<span className="material-symbols-outlined" style={{ fontSize: 22 }}>flag</span>}
-                onClick={() => onToast('Countdown initiated! Audio FX queued and arena displays locked.')}
-                sx={{ flexShrink: 0, fontWeight: 700, px: 3 }}
-              >
-                Initiate Race &amp; Sync Displays
-              </Button>
-            </Stack>
-          </SCard>
-        </Stack>
-
-        {/* Right: lane allocations */}
-        <SCard sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Bike Station Allocations</Typography>
-              <Typography variant="body2" sx={{ mt: 0.25 }}>Assign authenticated riders to lanes</Typography>
-            </Box>
-            <Button size="small" sx={{ color: C.secondary, fontSize: '12px', fontWeight: 600, px: 0 }}>
-              Re-seed Lanes
-            </Button>
-          </Stack>
-
-          {LANES.map((lane) => (
-            <Stack key={lane.id} direction="row" alignItems="center" justifyContent="space-between" gap={1.5}
-              sx={{ bgcolor: C.bg, p: 1.5, borderRadius: '10px', border: `1px solid ${C.borderLight}` }}>
-              <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
-                <Box sx={{
-                  width: 28, height: 28, borderRadius: '8px', flexShrink: 0,
-                  bgcolor: lane.status === 'empty' ? C.surfaceSubtle : C.primaryLighter,
-                  color: lane.status === 'empty' ? C.textSecondary : C.primary,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: `1px solid ${C.borderLight}`,
-                }}>
-                  <MonoText sx={{ fontSize: '10px', fontWeight: 700, color: 'inherit' }}>{lane.id}</MonoText>
-                </Box>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {lane.name}
-                  </Typography>
-                  <MonoText sx={{ fontSize: '10px', color: C.textMuted }}>
-                    {lane.ftp ? `FTP: ${lane.ftp} · ANT+ Ready` : 'NFC Tap or Bluetooth Auto'}
-                  </MonoText>
-                </Box>
-              </Stack>
-              {lane.status === 'Assigned' ? (
-                <Chip label="Assigned" color="success" size="small" />
-              ) : (
-                <Button size="small" variant="outlined" sx={{ fontSize: '12px', px: 1.5, flexShrink: 0 }}>
-                  Assign NFC
-                </Button>
-              )}
-            </Stack>
-          ))}
-
-          {/* Jumbotron feed */}
-          <Stack direction="row" alignItems="center" gap={1.5} sx={{ bgcolor: C.bg, p: 1.5, borderRadius: '10px', border: `1px solid ${C.borderLight}`, mt: 'auto' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: C.secondary }}>tv</span>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: '13px', fontWeight: 600, color: C.textPrimary }}>Jumbotron Main Feed</Typography>
-              <Typography variant="caption">Will display countdown screen upon trigger</Typography>
-            </Box>
-            <StatusDot color={C.success} pulse />
-          </Stack>
-        </SCard>
-      </Box>
-    </Stack>
-  );
-}
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -666,9 +467,7 @@ function Settings() {
         >
           {activeTab === "acmeter" && <MonitorACMeter />}
           {activeTab === "changegame" && <GameChange />}
-          {activeTab === "newmatch" && (
-            <StartNewMatchTab onToast={showToast} />
-          )}
+          {activeTab === "newmatch" && <StartNewMatch/> }
           {activeTab === "backend" && <BackendSettings />}
         </Box>
       </Fade>

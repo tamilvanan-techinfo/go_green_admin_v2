@@ -3,6 +3,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .manage(crate::check_receiver::ReceiverState::default())
+        .manage(crate::experience::ExperienceState::default())
         .invoke_handler(tauri::generate_handler![
             crate::backend::start_backend,
             crate::backend::stop_backend,
@@ -14,10 +15,18 @@ pub fn run() {
             crate::serial::scan_serial_ports,
             crate::terminal::show_backend_terminal,
             crate::logs::read_log_tail,
+            crate::experience::set_selected_experience,
+            crate::experience::get_selected_experience,
             crate::check_receiver::is_electron_running,
             crate::check_receiver::get_receiver_status,
             crate::check_receiver::start_receiver,
-            crate::check_receiver::stop_receiver
+            crate::check_receiver::stop_receiver,
+            crate::check_receiver::get_receiver_dir,
+            crate::new_match::check_server_status,
+            crate::new_match::find_db_path,
+            crate::new_match::get_backup_base_dir,
+            crate::new_match::run_new_match,
+            
         ])
         .run(tauri::generate_context!())
         .expect("error while running Go Green Admin");

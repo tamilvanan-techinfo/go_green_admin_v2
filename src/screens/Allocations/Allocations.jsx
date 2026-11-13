@@ -210,69 +210,183 @@ function Allocations() {
             </Tooltip>
           </Box>
 
-          {/* Section tabs  ← give the wrapper an id */}
+  
+          
+          {/* Section tabs — Settings-style responsive card navigation */}
           <Box
-            id="alloc-tab-bar"                // ← driver target
+            id="alloc-tab-bar"
             component="nav"
             role="tablist"
             aria-label="Allocations sections"
             sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: { xs: 0.5, md: 0.75, lg: 1, xl: 1.25 },
+              p: { xs: 0.5, md: 0.75, lg: 1 },
+              mb: { xs: 1.5, md: 2, lg: 2.5 },
+              bgcolor: "#F4F6FF",
+              border: "1px solid #D9DEEE",
+              borderRadius: "12px",
+              width: "100%",
+              boxSizing: "border-box",
               flexShrink: 0,
-              mt: 1,
-              mb: { xs: 1.5, md: 2.5 },
-              maxWidth: "100%",
-              overflowX: "auto",
-              scrollbarWidth: "none",
-              "&::-webkit-scrollbar": { display: "none" },
             }}
           >
-            <Stack
-              direction="row"
-              role="group"
-              sx={{
-                display: "inline-flex",
-                alignItems: "center",
-                bgcolor: "background.default",
-                borderRadius: 1,
-                p: 0.5,
-                border: "1px solid",
-                borderColor: "divider",
-                gap: 0.5,
-              }}
-            >
-              {TABS.map((t) => {
-                const selected = tab === t.key;
-                const IconComponent = t.icon;
-                return (
-                  <Button
-                    key={t.key}
-                    type="button"
-                    size="small"
-                    variant={selected ? "contained" : "text"}
-                    color="primary"
-                    role="tab"
-                    id={`alloc-tab-${t.key}`}              // ← already there ✅
-                    aria-controls={`alloc-panel-${t.key}`}
-                    aria-selected={selected}
-                    startIcon={<IconComponent sx={{ fontSize: 18 }} />}
-                    onClick={() => goTo(t.key)}
+            {TABS.map((t) => {
+              const selected = tab === t.key;
+              const IconComponent = t.icon;
+
+              const descriptions = {
+                cycles: "Manage cycling sessions",
+                participants: "Manage participants",
+                allocations: "Assign participants to cycles",
+              };
+
+              return (
+                <Box
+                  key={t.key}
+                  component="button"
+                  type="button"
+                  role="tab"
+                  id={`alloc-tab-${t.key}`}
+                  aria-controls={`alloc-panel-${t.key}`}
+                  aria-selected={selected}
+                  onClick={() => goTo(t.key)}
+                  sx={{
+                    appearance: "none",
+                    WebkitTapHighlightColor: "transparent",
+                    position: "relative",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    gap: { xs: 1, sm: 1.5 },
+                    minWidth: 0,
+                    minHeight: { xs: 62, sm: 72, md: 74 },
+                    px: { xs: 1.25, sm: 2, md: 2.25 },
+                    py: { xs: 1.25, sm: 1.75 },
+                    borderRadius: { xs: "9px", sm: "12px" },
+                    border: "1px solid",
+                    borderColor: selected
+                      ? "#A7DCC5"
+                      : "transparent",
+                    bgcolor: selected ? "#FFFFFF" : "transparent",
+                    color: selected ? "#064E3B" : "#475569",
+                    boxShadow: selected
+                      ? "0 3px 10px rgba(6,78,59,0.09), 0 1px 3px rgba(15,23,42,0.04)"
+                      : "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    font: "inherit",
+                    transition: [
+                      "background-color 220ms ease",
+                      "border-color 220ms ease",
+                      "box-shadow 240ms ease",
+                      "transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+                    ].join(", "),
+
+                    "&:hover": {
+                      bgcolor: "#FFFFFF",
+                      borderColor: selected
+                        ? "#A7DCC5"
+                        : "#D9E7DF",
+                      boxShadow:
+                        "0 5px 14px rgba(6,78,59,0.08)",
+                      transform: "translateY(-2px)",
+
+                      "& .alloc-tab-icon": {
+                        transform: "scale(1.07)",
+                        bgcolor: "#D1FAE5",
+                        color: "#064E3B",
+                      },
+
+                      "& .alloc-tab-label": {
+                        color: "#064E3B",
+                      },
+                    },
+
+                    "&:focus-visible": {
+                      outline: "2px solid #047857",
+                      outlineOffset: 2,
+                    },
+
+                    "&:active": {
+                      transform: "translateY(0) scale(0.985)",
+                    },
+
+                    "@media (prefers-reduced-motion: reduce)": {
+                      transition: "none",
+                      "&:hover, &:active": {
+                        transform: "none",
+                      },
+                    },
+                  }}
+                >
+                  {/* Icon */}
+                  <Box
+                    className="alloc-tab-icon"
                     sx={{
-                      minHeight: 34,
-                      px: { xs: 1.25, md: 2 },
-                      borderRadius: 0.75,
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
+                      width: { xs: 34, sm: 42 },
+                      height: { xs: 34, sm: 42 },
                       flexShrink: 0,
-                      fontSize: { xs: "0.75rem", md: "0.8125rem" },
-                      boxShadow: selected ? "0 1px 4px rgba(15,23,42,0.10)" : "none",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: { xs: "8px", sm: "10px" },
+                      bgcolor: selected ? "#D1FAE5" : "#E9ECF7",
+                      color: selected ? "#064E3B" : "#64748B",
+                      transition: [
+                        "background-color 240ms ease",
+                        "color 240ms ease",
+                        "transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+                      ].join(", "),
                     }}
                   >
-                    {t.label}
-                  </Button>
-                );
-              })}
-            </Stack>
+                    <IconComponent
+                      sx={{
+                        fontSize: { xs: 20, sm: 23 },
+                      }}
+                    />
+                  </Box>
+
+                  {/* Label and description */}
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography
+                      className="alloc-tab-label"
+                      sx={{
+                        fontSize: {
+                          xs: "13px",
+                          sm: "15px",
+                          md: "17px",
+                        },
+                        fontWeight: selected ? 700 : 600,
+                        color: selected ? "#064E3B" : "#334155",
+                        lineHeight: 1.4,
+                        overflowWrap: "anywhere",
+                        transition: "color 220ms ease",
+                      }}
+                    >
+                      {t.label}
+                    </Typography>
+
+                    <Typography
+                      sx={{
+                        mt: 0.35,
+                        fontSize: { xs: "10px", sm: "11px" },
+                        lineHeight: 1.3,
+                        color: "#64748B",
+                        display: { xs: "none", sm: "block" },
+                      }}
+                    >
+                      {descriptions[t.key]}
+                    </Typography>
+                  </Box>
+
+                </Box>
+              );
+            })}
           </Box>
+
 
           {/* Tab content — unchanged */}
           <Box

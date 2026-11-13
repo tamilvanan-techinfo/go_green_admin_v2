@@ -44,9 +44,10 @@ import ReactECharts from "echarts-for-react";
 import { useToast } from "../Allocations/Ui";
 import BottomSheet from "../../components/BottonSheet";
 import { tokens, studioSx } from "../../core/theme";
+import api from "../../config.json";
 
-const API = "http://localhost:8001";
-const WS = "ws://localhost:8001/ws/meters";
+const API = api.file_manager_api;
+const WS = `${api.file_manager_api.replace(/^http/, "ws")}/ws/meters`;
 
 const RECONNECT_MS = 3000;
 const MAX_POINTS = 3600;

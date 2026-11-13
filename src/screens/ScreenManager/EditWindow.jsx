@@ -153,7 +153,7 @@ function SectionHeading({ icon, title, description, action }) {
   );
 }
 
-function EditWindow({ onClose, selectedWindow, onSave }) {
+function EditWindow({ onClose, selectedWindow, onSave , selectedExperience}) {
   const toast = useToast();
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
@@ -185,11 +185,14 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
   }, []);
   const fetchScreens = async () => {
     try {
-      const res = await fetch(`${api.apiBase}/api/admin/screens/`);
+      const res = await fetch(`${api.apiBase}/api/admin/screens/?game=${encodeURIComponent(selectedExperience)}`);
       if (!res.ok) throw new Error("Failed to fetch screens");
       const data = await res.json();
+      const experienceScreens = (data.data || []).filter(
+        (screen) => screen.game === selectedExperience
+      );
       console.log("Fetched screens:", data);
-      setScreens(data.data || []);
+      setScreens(experienceScreens);
     } catch (error) {
       console.error("Error fetching screens:", error);
     } finally {
@@ -348,7 +351,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
             setSaving(false);
             toast(data.message || "The backend rejected the configuration.");
           } else {
-            toast(data.message || "Window WebSocket error.");
+            toast(data.message || "Window WebSocket error.", "error");
           }
 
           return;
@@ -365,6 +368,14 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
           // Ignore events for another window.
           if (Number(responseWindowId) !== Number(windowId)) {
             return;
+          }
+
+          if (data.properties) {
+            window.dispatchEvent(
+              new CustomEvent("window-config-pushed", {
+                detail: { window_id: responseWindowId, properties: data.properties },
+              })
+            );
           }
 
           const pending = pendingPushRef.current;
@@ -481,7 +492,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
 
       setSocketConnected(false);
     };
-  }, [connectWindowSocket, clearPendingPush]);
+  }, [connectWindowSocket, clearPendingPush, selectedExperience]);
 
   const handleNumberChange = useCallback((field, value) => {
     setConfig((previous) => ({
@@ -587,7 +598,7 @@ function EditWindow({ onClose, selectedWindow, onSave }) {
     clearPendingPush();
     setSaving(false);
     toast(
-      error?.message || "Unable to push window configuration."
+      error?.message || "Unable to push window configuration.", "error"
     );
   }
 }, [config, windowData, windowId, clearPendingPush]);

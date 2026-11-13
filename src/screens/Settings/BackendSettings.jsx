@@ -11,6 +11,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+
 import {
   RefreshRounded,
   TerminalRounded,
@@ -23,6 +24,7 @@ import {
 
 import { useToast } from "../Allocations/Ui";
 import { tokens, studioSx } from "../../core/theme";
+import api from "../../config.json";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const BTN_H = 32;
@@ -36,7 +38,7 @@ const BACKENDS = [
     configKey: "dc",
     module: "electricity_monitoring_be.application:application",
     iconLetter: "DC",
-    readControlUrl: "http://localhost:8000/api/update-mode/",
+    readControlUrl: `${api.apiBase}/api/update-mode/`,
   },
   {
     name: "fastapi",
@@ -46,7 +48,7 @@ const BACKENDS = [
     configKey: "ac",
     module: "local_folder.main:app",
     iconLetter: "AC",
-    readControlUrl: "http://localhost:8000/api/update-mode/",
+    readControlUrl: `${api.file_manager_api}/api/update-mode/`,
   },
 ];
 
@@ -62,13 +64,20 @@ const BAUD_RATES = [
 ];
 
 const POLL_PRESETS_S = [1, 2, 5, 10];
-const emptyConfig = { port: "", baudRate: 9600, pollInterval: 1 };
+
+const emptyConfig = {
+  port: "",
+  baudRate: 9600,
+  pollInterval: 1,
+  enabled: false,
+};
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
 const LS_STATUS_KEY = "gg_backend_running_cache";
 const LS_UPTIME_KEY = "gg_backend_uptime";
 const LS_LAST_RUN_KEY = "gg_backend_last_run";
 const LS_TODAY_KEY = "gg_backend_today";
+const LS_READCONTROL_KEY = "gg_backend_readcontrol_cache";
 
 const lsRead = (key) => {
   try {
@@ -100,6 +109,34 @@ function writeCache(statuses) {
   }
 
   lsWrite(LS_STATUS_KEY, slim);
+}
+
+// ─── readControls cache ───────────────────────────────────────────────────────
+function readReadControlCache() {
+  const cached = lsRead(LS_READCONTROL_KEY);
+
+  return {
+    django: {
+      enabled: Boolean(cached.django?.enabled),
+      loading: true,
+      saving: false,
+    },
+    fastapi: {
+      enabled: Boolean(cached.fastapi?.enabled),
+      loading: true,
+      saving: false,
+    },
+  };
+}
+
+function writeReadControlCache(readControls) {
+  const slim = {};
+
+  for (const [key, value] of Object.entries(readControls)) {
+    slim[key] = { enabled: Boolean(value.enabled) };
+  }
+
+  lsWrite(LS_READCONTROL_KEY, slim);
 }
 
 // ─── Time formatters ──────────────────────────────────────────────────────────
@@ -260,14 +297,15 @@ function useTodayRuntime(statuses) {
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const buttonSx = {
-  height: BTN_H,
-  minHeight: BTN_H,
+  height: { xs: 38, lg: 32, xl: 36 },
+  minHeight: { xs: 38, lg: 32, xl: 36 },
   boxSizing: "border-box",
   alignSelf: "center",
   whiteSpace: "nowrap",
   flexShrink: 0,
-  px: 1.75,
+  px: { xs: 1.25, lg: 1.5, xl: 1.75 },
   py: 0,
+  fontSize: { xs: "0.72rem", lg: "0.68rem", xl: "0.75rem" },
   "& .MuiButton-startIcon": { mr: 0.75 },
 };
 
@@ -327,7 +365,7 @@ function StatusChip({ label, tone = "success" }) {
   );
 }
 
-function StatPill({ icon, label, children })  {
+function StatPill({ icon, label, children }) {
   return (
     <Box
       sx={{
@@ -335,6 +373,7 @@ function StatPill({ icon, label, children })  {
         alignItems: "center",
         gap: 0.75,
         minWidth: 0,
+        flexWrap: "wrap",
       }}
     >
       <Box sx={{ display: "flex", color: tokens.textLightSecondary }}>
@@ -344,7 +383,7 @@ function StatPill({ icon, label, children })  {
       <Typography
         sx={{
           fontFamily: tokens.mono,
-          fontSize: "0.7rem",
+          fontSize: { xs: "0.68rem", lg: "0.65rem", xl: "0.7rem" },
           color: tokens.textLightSecondary,
           whiteSpace: "nowrap",
         }}
@@ -359,7 +398,7 @@ function StatPill({ icon, label, children })  {
 
 const statValueSx = {
   fontFamily: tokens.mono,
-  fontSize: "0.7rem",
+  fontSize: { xs: "0.68rem", lg: "0.65rem", xl: "0.7rem" },
   fontWeight: 700,
   color: tokens.ink,
   whiteSpace: "nowrap",
@@ -373,7 +412,7 @@ function VDivider() {
         width: "1px",
         height: 22,
         bgcolor: tokens.lineLight,
-        display: { xs: "none", md: "block" },
+        display: { xs: "none", lg: "block" },
       }}
     />
   );
@@ -401,18 +440,27 @@ function UptimeRow({ running, startedAtMs, lastRunMs, todayMs }) {
   return (
     <Box
       sx={{
-        px: 2.5,
-        py: 1.1,
+        px: { xs: 1.75, lg: 2, xl: 2.5 },
+        py: { xs: 1.25, lg: 1, xl: 1.1 },
         display: "flex",
-        alignItems: "center",
+        alignItems: { xs: "flex-start", sm: "center" },
+        justifyContent: "space-between",
         flexWrap: "wrap",
-        columnGap: 2,
-        rowGap: 0.5,
+        columnGap: 1.5,
+        rowGap: 0.75,
         bgcolor: live ? "#F0FDF4" : tokens.surface,
         borderBottom: `1px solid ${tokens.lineLight}`,
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: { xs: 0.75, lg: 1 },
+          minWidth: 0,
+          flexWrap: "wrap",
+        }}
+      >
         <AccessTimeRounded sx={{ fontSize: 15, color: iconColor }} />
 
         <Typography
@@ -449,10 +497,11 @@ function UptimeRow({ running, startedAtMs, lastRunMs, todayMs }) {
 
       <Box
         sx={{
-          ml: "auto",
+          ml: { xs: 0, sm: "auto" },
           display: "flex",
           alignItems: "center",
           gap: 1,
+          flexShrink: 0,
         }}
       >
         <Typography
@@ -482,11 +531,8 @@ function UptimeRow({ running, startedAtMs, lastRunMs, todayMs }) {
   );
 }
 
-// ─── Modbus control helpers ──────────────────────────────────────────────────
-const initialReadControls = {
-  django: { enabled: false, loading: true, saving: false },
-  fastapi: { enabled: false, loading: true, saving: false },
-};
+// ─── Modbus control helpers ───────────────────────────────────────────────────
+const getInitialReadControls = () => readReadControlCache();
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function BackendSettings() {
@@ -505,8 +551,12 @@ export default function BackendSettings() {
   const [pendingToggle, setPendingToggle] = useState({});
   const [busy, setBusy] = useState({});
 
-  // Independent Modbus read controls for AC and DC.
-  const [readControls, setReadControls] = useState(initialReadControls);
+  const [readControls, setReadControls] = useState(getInitialReadControls);
+
+  const pendingToggleRef = useRef({});
+  useEffect(() => {
+    pendingToggleRef.current = pendingToggle;
+  }, [pendingToggle]);
 
   const { uptimes, lastRuns } = useRunningTimer(statuses);
   const todayMs = useTodayRuntime(statuses);
@@ -531,14 +581,32 @@ export default function BackendSettings() {
   };
 
   const applyStatuses = useCallback((result) => {
-    const next = {};
+    const incoming = {};
 
     result.forEach((item) => {
-      next[item.name] = item;
+      incoming[item.name] = item;
     });
 
-    setStatuses(next);
-    writeCache(next);
+    setStatuses((prev) => {
+      const next = { ...prev, ...incoming };
+
+      for (const name of Object.keys(incoming)) {
+        const toggledRecently = Boolean(pendingToggleRef.current[name]);
+        const incomingSaysNotRunning = !incoming[name]?.running;
+        const weOptimisticallySetRunning = Boolean(prev[name]?.running);
+
+        if (
+          toggledRecently &&
+          incomingSaysNotRunning &&
+          weOptimisticallySetRunning
+        ) {
+          next[name] = prev[name];
+        }
+      }
+
+      writeCache(next);
+      return next;
+    });
   }, []);
 
   const refreshStatuses = useCallback(async () => {
@@ -576,22 +644,27 @@ export default function BackendSettings() {
     }
   }, [toast]);
 
-  // ─── Load AC/DC Modbus status ──────────────────────────────────────────────
   const loadReadControl = useCallback(
     async (backend) => {
-      setReadControls((prev) => ({
-        ...prev,
-        [backend.name]: {
-          ...prev[backend.name],
-          loading: true,
-        },
-      }));
+      setReadControls((prev) => {
+        const next = {
+          ...prev,
+          [backend.name]: {
+            ...prev[backend.name],
+            loading: true,
+          },
+        };
+        return next;
+      });
 
       try {
-        const response = await fetch(`${backend.readControlUrl}?meter=${backend.short}`, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-        });
+        const response = await fetch(
+          `${backend.readControlUrl}?meter=${backend.short}`,
+          {
+            method: "GET",
+            headers: { Accept: "application/json" },
+          }
+        );
 
         if (!response.ok) {
           throw new Error(
@@ -601,19 +674,25 @@ export default function BackendSettings() {
 
         const data = await response.json();
 
-        setReadControls((prev) => ({
-          ...prev,
-          [backend.name]: {
-            ...prev[backend.name],
-            enabled: Boolean(data.mode ?? data.data?.mode ?? data.read_enabled ?? data.data?.read_enabled),
-            loading: false,
-          },
-        }));
+        setReadControls((prev) => {
+          const next = {
+            ...prev,
+            [backend.name]: {
+              ...prev[backend.name],
+              enabled: Boolean(
+                data.mode ??
+                  data.data?.mode ??
+                  data.read_enabled ??
+                  data.data?.read_enabled
+              ),
+              loading: false,
+            },
+          };
+          writeReadControlCache(next);
+          return next;
+        });
       } catch (e) {
-        console.error(
-          `Failed to load ${backend.short} Modbus status:`,
-          e
-        );
+        console.error(`Failed to load ${backend.short} Modbus status:`, e);
 
         setReadControls((prev) => ({
           ...prev,
@@ -629,10 +708,10 @@ export default function BackendSettings() {
     [toast]
   );
 
-  // ─── AC/DC Modbus toggle ──────────────────────────────────────────────────
   const handleReadControlToggle = useCallback(
     async (backend, nextEnabled) => {
       const isRunning = Boolean(statuses[backend.name]?.running);
+      if (readControls[backend.name]?.saving) return;
 
       if (!isRunning) {
         toast(
@@ -681,16 +760,26 @@ export default function BackendSettings() {
           data = await response.json();
         } catch {}
 
-        setReadControls((prev) => ({
-          ...prev,
-          [backend.name]: {
-            ...prev[backend.name],
-            enabled:
-              typeof (data.mode ?? data.data?.mode ?? data.read_enabled ?? data.data?.read_enabled) === "boolean"
-                ? (data.mode ?? data.data?.mode ?? data.read_enabled ?? data.data?.read_enabled)
-                : nextEnabled,
-          },
-        }));
+        setReadControls((prev) => {
+          const next = {
+            ...prev,
+            [backend.name]: {
+              ...prev[backend.name],
+              enabled:
+                typeof (data.mode ??
+                  data.data?.mode ??
+                  data.read_enabled ??
+                  data.data?.read_enabled) === "boolean"
+                  ? data.mode ??
+                    data.data?.mode ??
+                    data.read_enabled ??
+                    data.data?.read_enabled
+                  : nextEnabled,
+            },
+          };
+          writeReadControlCache(next);
+          return next;
+        });
 
         toast(
           `${backend.short} Modbus reading ${
@@ -698,10 +787,7 @@ export default function BackendSettings() {
           }.`
         );
       } catch (e) {
-        console.error(
-          `Failed to update ${backend.short} Modbus status:`,
-          e
-        );
+        console.error(`Failed to update ${backend.short} Modbus status:`, e);
         toast(String(e), "error");
       } finally {
         setReadControls((prev) => ({
@@ -713,22 +799,43 @@ export default function BackendSettings() {
         }));
       }
     },
-    [statuses, toast]
+    [statuses, readControls, toast]
   );
 
   useEffect(() => {
-    refreshStatuses();
-    loadConfigs();
-    scanPorts();
-
-    BACKENDS.forEach((backend => {
-      loadReadControl(backend);
-    }));
+    (async () => {
+      await refreshStatuses();
+      loadConfigs();
+      scanPorts();
+    })();
 
     const timer = setInterval(refreshStatuses, 3000);
-
     return () => clearInterval(timer);
-  }, [refreshStatuses, loadConfigs, loadReadControl, scanPorts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const djangoRunning = Boolean(statuses.django?.running);
+  const fastapiRunning = Boolean(statuses.fastapi?.running);
+
+  useEffect(() => {
+    BACKENDS.forEach((backend) => {
+      const running = Boolean(statuses[backend.name]?.running);
+
+      if (running) {
+        loadReadControl(backend);
+      } else {
+        setReadControls((prev) => {
+          const next = {
+            ...prev,
+            [backend.name]: { enabled: false, loading: false, saving: false },
+          };
+          writeReadControlCache(next);
+          return next;
+        });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [djangoRunning, fastapiRunning]);
 
   const updateConfig = (key, field, value) =>
     setConfigs((prev) => ({
@@ -739,7 +846,6 @@ export default function BackendSettings() {
       },
     }));
 
-  // ─── Start / stop backend ──────────────────────────────────────────────────
   const toggleDaemon = async (backend) => {
     const currentlyRunning = Boolean(statuses[backend.name]?.running);
 
@@ -762,9 +868,11 @@ export default function BackendSettings() {
       return next;
     });
 
+    const otherBackend = BACKENDS.find((b) => b.name !== backend.name);
+    const otherRunning = Boolean(statuses[otherBackend.name]?.running);
+
     try {
       if (currentlyRunning) {
-        // Disable this backend's Modbus polling before stopping it.
         const readState = readControls[backend.name];
 
         if (readState?.enabled) {
@@ -784,13 +892,17 @@ export default function BackendSettings() {
               );
             }
 
-            setReadControls((prev) => ({
-              ...prev,
-              [backend.name]: {
-                ...prev[backend.name],
-                enabled: false,
-              },
-            }));
+            setReadControls((prev) => {
+              const next = {
+                ...prev,
+                [backend.name]: {
+                  ...prev[backend.name],
+                  enabled: false,
+                },
+              };
+              writeReadControlCache(next);
+              return next;
+            });
           } catch (e) {
             toast(
               `Could not disable ${backend.short} Modbus reading: ${String(e)}`,
@@ -801,34 +913,58 @@ export default function BackendSettings() {
 
         await invoke("stop_backend", { name: backend.name });
 
+        try {
+          await invoke("save_backend_configs", {
+            configs: {
+              [backend.configKey]: {
+                ...configs[backend.configKey],
+                enabled: false,
+              },
+            },
+          });
+          updateConfig(backend.configKey, "enabled", false);
+        } catch {}
+
         toast(`${backend.title} stopped.`);
       } else {
-        await invoke("save_backend_configs", { configs });
+        const myPort = (configs[backend.configKey].port || "").trim();
+        const otherPort = (configs[otherBackend.configKey].port || "").trim();
 
-        toast(
-          `${backend.title} starting… health check will update shortly.`
-        );
+        if (otherRunning && myPort && myPort === otherPort) {
+          throw new Error(
+            `Cannot start ${backend.short}: COM port ${myPort} is in use by the running ${otherBackend.short} daemon. Stop ${otherBackend.short} first.`
+          );
+        }
 
-        invoke("start_backend", {
+        const savePayload = {
+          [backend.configKey]: {
+            ...configs[backend.configKey],
+            enabled: true,
+          },
+        };
+
+        if (!otherRunning) {
+          savePayload[otherBackend.configKey] = {
+            ...configs[otherBackend.configKey],
+            enabled: false,
+          };
+        }
+
+        await invoke("save_backend_configs", { configs: savePayload });
+
+        updateConfig(backend.configKey, "enabled", true);
+        if (!otherRunning) {
+          updateConfig(otherBackend.configKey, "enabled", false);
+        }
+
+        toast(`${backend.title} starting… health check will update shortly.`);
+
+        await invoke("start_backend", {
           name: backend.name,
           pythonMode,
-        }).catch((e) => {
-          toast(`Failed to start ${backend.title}: ${String(e)}`, "error");
-
-          setStatuses((prev) => {
-            const next = {
-              ...prev,
-              [backend.name]: {
-                ...(prev[backend.name] || {}),
-                running: false,
-                healthy: false,
-              },
-            };
-
-            writeCache(next);
-            return next;
-          });
         });
+
+        await refreshStatuses();
       }
     } catch (e) {
       toast(`Backend action failed: ${String(e)}`, "error");
@@ -845,53 +981,54 @@ export default function BackendSettings() {
         writeCache(next);
         return next;
       });
-    } finally {
+
       setPendingToggle((prev) => ({
         ...prev,
         [backend.name]: false,
       }));
-
-      setTimeout(refreshStatuses, 800);
+      return;
     }
+
+    setTimeout(async () => {
+      await refreshStatuses();
+      setPendingToggle((prev) => ({
+        ...prev,
+        [backend.name]: false,
+      }));
+    }, 800);
   };
 
   const restartBackend = (backend) =>
     runAction(
       backend.name,
       async () => {
-        // Disable the selected backend's Modbus polling before restart.
-        if (readControls[backend.name]?.enabled) {
-          const response = await fetch(backend.readControlUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({ meter: backend.short, mode: false }),
-          });
+        const otherBackend = BACKENDS.find((b) => b.name !== backend.name);
+        const otherRunning = Boolean(statuses[otherBackend.name]?.running);
 
-          if (!response.ok) {
-            throw new Error(
-              `Unable to disable ${backend.short} Modbus reading before restart.`
-            );
-          }
+        const savePayload = {
+          [backend.configKey]: {
+            ...configs[backend.configKey],
+            enabled: true,
+          },
+        };
 
-          setReadControls((prev) => ({
-            ...prev,
-            [backend.name]: {
-              ...prev[backend.name],
-              enabled: false,
-            },
-          }));
+        if (!otherRunning) {
+          savePayload[otherBackend.configKey] = {
+            ...configs[otherBackend.configKey],
+            enabled: false,
+          };
         }
 
-        await invoke("save_backend_configs", { configs });
+        await invoke("save_backend_configs", { configs: savePayload });
+
+        updateConfig(backend.configKey, "enabled", true);
+        if (!otherRunning) {
+          updateConfig(otherBackend.configKey, "enabled", false);
+        }
+
         await invoke("stop_backend", { name: backend.name });
 
-        return invoke("start_backend", {
-          name: backend.name,
-          pythonMode,
-        });
+        return invoke("start_backend", { name: backend.name, pythonMode });
       },
       `${backend.title} restarting…`
     ).then(refreshStatuses);
@@ -900,9 +1037,25 @@ export default function BackendSettings() {
     runAction(
       "all",
       async () => {
-        await invoke("save_backend_configs", { configs });
+        const acPort = (configs.ac.port || "").trim();
+        const dcPort = (configs.dc.port || "").trim();
 
-        // Disable AC and DC Modbus polling independently.
+        if (acPort && dcPort && acPort === dcPort) {
+          throw new Error(
+            `Cannot restart all: AC and DC are both configured on ${acPort}. Change one port, or restart individually.`
+          );
+        }
+
+        const savePayload = {
+          ac: { ...configs.ac, enabled: Boolean(acPort) },
+          dc: { ...configs.dc, enabled: Boolean(dcPort) },
+        };
+
+        await invoke("save_backend_configs", { configs: savePayload });
+
+        updateConfig("ac", "enabled", Boolean(acPort));
+        updateConfig("dc", "enabled", Boolean(dcPort));
+
         for (const backend of BACKENDS) {
           if (readControls[backend.name]?.enabled) {
             const response = await fetch(backend.readControlUrl, {
@@ -920,13 +1073,17 @@ export default function BackendSettings() {
               );
             }
 
-            setReadControls((prev) => ({
-              ...prev,
-              [backend.name]: {
-                ...prev[backend.name],
-                enabled: false,
-              },
-            }));
+            setReadControls((prev) => {
+              const next = {
+                ...prev,
+                [backend.name]: {
+                  ...prev[backend.name],
+                  enabled: false,
+                },
+              };
+              writeReadControlCache(next);
+              return next;
+            });
           }
         }
 
@@ -968,11 +1125,16 @@ export default function BackendSettings() {
   return (
     <Box sx={{ width: "100%", minWidth: 0, pb: 1 }}>
       {/* Page header */}
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: { xs: 1.5, lg: 1.75, xl: 2 } }}>
         <Typography
           sx={{
             fontWeight: 800,
-            fontSize: "1.05rem",
+            fontSize: {
+              xs: "0.95rem",
+              sm: "1rem",
+              lg: "0.98rem",
+              xl: "1.05rem",
+            },
             color: tokens.ink,
             mb: 0.5,
             textAlign: "left",
@@ -981,7 +1143,13 @@ export default function BackendSettings() {
           Backend &amp; Infrastructure Settings
         </Typography>
 
-        <Typography sx={{ ...studioSx.secondaryText, maxWidth: 560 }}>
+        <Typography
+          sx={{
+            ...studioSx.secondaryText,
+            maxWidth: 560,
+            fontSize: { xs: "0.75rem", lg: "0.72rem", xl: "0.8rem" },
+          }}
+        >
           Configure serial meters and manage independent backend processes for
           AC and DC meter acquisition.
         </Typography>
@@ -991,18 +1159,26 @@ export default function BackendSettings() {
       <Box
         sx={{
           ...studioSx.card,
-          px: 2.5,
-          py: 2.25,
-          minHeight: 76,
-          mb: 2.5,
+          px: { xs: 1.5, sm: 2, lg: 1.75, xl: 2.5 },
+          py: { xs: 1.5, sm: 1.75, lg: 1.5, xl: 2.25 },
+          minHeight: { xs: "auto", lg: 70, xl: 76 },
+          mb: { xs: 1.75, lg: 2, xl: 2.5 },
           display: "flex",
           alignItems: "center",
           flexWrap: "wrap",
-          columnGap: 2,
-          rowGap: 1.5,
+          columnGap: { xs: 1.25, lg: 1.5, xl: 2 },
+          rowGap: { xs: 1.25, lg: 1, xl: 1.5 },
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: { xs: 0.75, lg: 1, xl: 1.25 },
+            minWidth: 0,
+          }}
+        >
           <Box
             sx={{
               width: 9,
@@ -1013,7 +1189,12 @@ export default function BackendSettings() {
             }}
           />
 
-          <Typography sx={{ ...studioSx.cardTitle, fontSize: "0.88rem" }}>
+          <Typography
+            sx={{
+              ...studioSx.cardTitle,
+              fontSize: { xs: "0.8rem", lg: "0.78rem", xl: "0.88rem" },
+            }}
+          >
             Modbus RTU Master Engine
           </Typography>
 
@@ -1030,7 +1211,9 @@ export default function BackendSettings() {
           icon={<SyncAltRounded sx={{ fontSize: 16 }} />}
           label="Runtime Today"
         >
-          <Typography sx={statValueSx}>{hmShort(combinedTodayMs)}</Typography>
+          <Typography sx={statValueSx}>
+            {hmShort(combinedTodayMs)}
+          </Typography>
         </StatPill>
 
         <VDivider />
@@ -1062,7 +1245,7 @@ export default function BackendSettings() {
               <Typography
                 sx={{
                   fontFamily: tokens.mono,
-                  fontSize: "0.7rem",
+                  fontSize: { xs: "0.68rem", lg: "0.65rem", xl: "0.7rem" },
                   color: tokens.textLightSecondary,
                 }}
               >
@@ -1083,6 +1266,10 @@ export default function BackendSettings() {
             alignItems: "center",
             flexWrap: "wrap",
             gap: 1,
+            width: { xs: "100%", md: "auto" },
+            "& .MuiButton-root": {
+              flex: { xs: "1 1 100%", sm: "0 1 auto" },
+            },
           }}
         >
           <Button
@@ -1110,12 +1297,16 @@ export default function BackendSettings() {
       <Box
         sx={{
           display: "grid",
+          // was hardcoded to 2 columns at every width — stacks to one
+          // column below `md` so each card gets full room on phones
+          // and narrow tablets instead of being squeezed side-by-side
           gridTemplateColumns: {
             xs: "minmax(0, 1fr)",
-            lg: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(2, minmax(0, 1fr))",
           },
-          gap: 2,
+          gap: { xs: 1.5, lg: 1.75, xl: 2 },
           alignItems: "start",
+          minWidth: 0,
         }}
       >
         {BACKENDS.map((backend) => {
@@ -1140,33 +1331,37 @@ export default function BackendSettings() {
                 ...studioSx.card,
                 overflow: "hidden",
                 minWidth: 0,
+                width: "100%",
+                height: "auto",
               }}
             >
               {/* Header */}
               <Box
                 sx={{
-                  px: 2.5,
-                  py: 2,
+                  px: { xs: 1.75, sm: 2, lg: 1.75, xl: 2.5 },
+                  py: { xs: 1.5, lg: 1.5, xl: 2 },
                   display: "flex",
-                  alignItems: "flex-start",
+                  alignItems: "center",
                   justifyContent: "space-between",
-                  gap: 1.5,
+                  gap: 1,
+                  flexWrap: "wrap",
                 }}
               >
                 <Box
                   sx={{
                     display: "flex",
-                    alignItems: "flex-start",
-                    gap: 1.5,
-                    flex: 1,
+                    alignItems: "center",
+                    gap: { xs: 1, lg: 1.25, xl: 1.5 },
+                    flex: "1 1 220px",
                     minWidth: 0,
                   }}
                 >
                   <Box
                     sx={{
                       ...studioSx.iconTile,
-                      width: 40,
-                      height: 40,
+                      width: { xs: 36, lg: 36, xl: 40 },
+                      height: { xs: 36, lg: 36, xl: 40 },
+                      flexShrink: 0,
                       fontFamily: tokens.mono,
                       fontSize: 14,
                       fontWeight: 800,
@@ -1181,15 +1376,27 @@ export default function BackendSettings() {
                         display: "flex",
                         alignItems: "center",
                         flexWrap: "wrap",
-                        gap: 1,
+                        gap: 0.75,
                       }}
                     >
-                      <Typography fontWeight={700} fontSize={15}>
+                      <Typography
+                        fontWeight={700}
+                        sx={{
+                          fontSize: {
+                            xs: "0.85rem",
+                            lg: "0.82rem",
+                            xl: "0.94rem",
+                          },
+                        }}
+                      >
                         {backend.title}
                       </Typography>
 
                       {running && healthy && (
-                        <StatusChip label="Active / Connected" tone="success" />
+                        <StatusChip
+                          label="Active / Connected"
+                          tone="success"
+                        />
                       )}
 
                       {running && !healthy && (
@@ -1217,6 +1424,7 @@ export default function BackendSettings() {
                     alignItems: "center",
                     gap: 0.5,
                     flexShrink: 0,
+                    ml: "auto",
                   }}
                 >
                   <Typography sx={studioSx.secondaryText}>Daemon</Typography>
@@ -1242,21 +1450,27 @@ export default function BackendSettings() {
                 todayMs={todayMs[backend.name]}
               />
 
-              {/* Independent Modbus controls for AC and DC */}
+              {/* Modbus Reading toggle */}
               <Divider />
 
               <Box
                 sx={{
-                  px: 2.5,
-                  py: 1.5,
+                  px: { xs: 1.75, sm: 2, lg: 1.75, xl: 2.5 },
+                  py: { xs: 1.25, lg: 1.25, xl: 1.5 },
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  gap: 1.5,
+                  gap: 1,
+                  flexWrap: "wrap",
                   bgcolor: readControl.enabled ? "#F0FDF4" : tokens.surface,
                 }}
               >
-                <Box sx={{ minWidth: 0 }}>
+                <Box
+                  sx={{
+                    minWidth: 0,
+                    flex: "1 1 180px",
+                  }}
+                >
                   <Typography
                     sx={{
                       fontWeight: 700,
@@ -1290,6 +1504,7 @@ export default function BackendSettings() {
                     alignItems: "center",
                     gap: 1,
                     flexShrink: 0,
+                    ml: "auto",
                   }}
                 >
                   {!readControl.loading && (
@@ -1320,21 +1535,23 @@ export default function BackendSettings() {
               {/* Body */}
               <Box
                 sx={{
-                  px: 2.5,
-                  pt: 2.25,
-                  pb: 1,
+                  px: { xs: 1.75, sm: 2, lg: 1.75, xl: 2.5 },
+                  pt: { xs: 1.75, lg: 1.75, xl: 2.25 },
+                  pb: { xs: 1, lg: 0.75, xl: 1 },
                   display: "flex",
                   flexDirection: "column",
-                  gap: 2,
+                  gap: { xs: 1.75, lg: 1.5, xl: 2 },
+                  minWidth: 0,
                 }}
               >
                 {/* Serial / COM Port */}
-                <Box>
+                <Box sx={{ minWidth: 0 }}>
                   <Box
                     sx={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
+                      gap: 1,
                       mb: 0.75,
                     }}
                   >
@@ -1349,6 +1566,7 @@ export default function BackendSettings() {
                         height: 22,
                         p: 0,
                         minWidth: 0,
+                        flexShrink: 0,
                         fontFamily: tokens.mono,
                         fontSize: "0.65rem",
                         color: tokens.brandAccent,
@@ -1367,6 +1585,9 @@ export default function BackendSettings() {
                       display: "flex",
                       alignItems: "center",
                       gap: 1,
+                      width: "100%",
+                      minWidth: 0,
+                      flexWrap: { xs: "wrap", sm: "nowrap" },
                     }}
                   >
                     <TextField
@@ -1381,15 +1602,17 @@ export default function BackendSettings() {
                           event.target.value
                         )
                       }
+                      sx={{
+                        flex: "1 1 180px",
+                        minWidth: 0,
+                      }}
                       slotProps={{
                         select: {
                           displayEmpty: true,
                         },
                       }}
                     >
-                      <MenuItem value="">
-                        — Select COM port —
-                      </MenuItem>
+                      <MenuItem value="">— Select COM port —</MenuItem>
 
                       {config.port && !ports.includes(config.port) && (
                         <MenuItem value={config.port}>
@@ -1412,6 +1635,8 @@ export default function BackendSettings() {
                         ...buttonSx,
                         height: 38,
                         minHeight: 38,
+                        flex: { xs: "1 1 100%", sm: "0 0 auto" },
+                        width: { xs: "100%", sm: "auto" },
                       }}
                     >
                       Detect
@@ -1420,7 +1645,7 @@ export default function BackendSettings() {
                 </Box>
 
                 {/* Baud Rate */}
-                <Box>
+                <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ ...fieldLabelSx, mb: 0.75 }}>
                     Baud Rate
                   </Typography>
@@ -1437,6 +1662,12 @@ export default function BackendSettings() {
                         Number(event.target.value)
                       )
                     }
+                    sx={{
+                      minWidth: 0,
+                      "& .MuiSelect-select": {
+                        fontSize: { xs: "0.82rem", lg: "0.78rem", xl: "0.85rem" },
+                      },
+                    }}
                   >
                     {BAUD_RATES.map((rate) => (
                       <MenuItem key={rate.value} value={rate.value}>
@@ -1447,13 +1678,14 @@ export default function BackendSettings() {
                 </Box>
 
                 {/* Polling Interval */}
-                <Box>
+                <Box sx={{ minWidth: 0 }}>
                   <Box
                     sx={{
                       display: "flex",
-                      alignItems: "center",
+                      alignItems: { xs: "flex-start", sm: "center" },
                       justifyContent: "space-between",
-                      gap: 1,
+                      flexWrap: "wrap",
+                      gap: 0.75,
                       mb: 0.75,
                     }}
                   >
@@ -1479,10 +1711,15 @@ export default function BackendSettings() {
                     <Typography
                       sx={{
                         fontFamily: tokens.mono,
-                        fontSize: "0.68rem",
+                        fontSize: {
+                          xs: "0.65rem",
+                          lg: "0.63rem",
+                          xl: "0.68rem",
+                        },
                         fontWeight: 700,
                         color: tokens.brand,
-                        whiteSpace: "nowrap",
+                        whiteSpace: { xs: "normal", sm: "nowrap" },
+                        textAlign: { xs: "left", sm: "right" },
                       }}
                     >
                       {config.pollInterval === ""
@@ -1498,6 +1735,8 @@ export default function BackendSettings() {
                       alignItems: "center",
                       flexWrap: "wrap",
                       gap: 1,
+                      width: "100%",
+                      minWidth: 0,
                     }}
                   >
                     <TextField
@@ -1539,7 +1778,7 @@ export default function BackendSettings() {
                         },
                       }}
                       sx={{
-                        flex: "1 1 140px",
+                        flex: "1 1 100px",
                         minWidth: 0,
                         "& input": {
                           fontFamily: tokens.mono,
@@ -1551,8 +1790,10 @@ export default function BackendSettings() {
                     <Box
                       sx={{
                         display: "flex",
-                        gap: 0.75,
-                        flexShrink: 0,
+                        flexWrap: "wrap",
+                        gap: { xs: 0.5, lg: 0.6, xl: 0.75 },
+                        flex: "1 1 auto",
+                        minWidth: 0,
                       }}
                     >
                       {POLL_PRESETS_S.map((preset) => {
@@ -1572,8 +1813,9 @@ export default function BackendSettings() {
                             sx={{
                               height: 38,
                               minHeight: 38,
-                              minWidth: 52,
-                              px: 1.5,
+                              minWidth: { xs: 0, sm: 44, xl: 52 },
+                              flex: { xs: "1 1 42px", sm: "0 0 auto" },
+                              px: { xs: 1, xl: 1.5 },
                               py: 0,
                               borderRadius: "8px",
                               fontFamily: tokens.mono,
@@ -1603,13 +1845,16 @@ export default function BackendSettings() {
               {/* Footer */}
               <Box
                 sx={{
-                  px: 2.5,
-                  py: 1.75,
+                  px: { xs: 1.75, sm: 2, lg: 1.75, xl: 2.5 },
+                  py: { xs: 1.5, lg: 1.25, xl: 1.75 },
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "stretch",
                   justifyContent: "flex-end",
                   flexWrap: "wrap",
                   gap: 1,
+                  "& .MuiButton-root": {
+                    flex: { xs: "1 1 100%", sm: "0 1 auto" },
+                  },
                 }}
               >
                 <Button

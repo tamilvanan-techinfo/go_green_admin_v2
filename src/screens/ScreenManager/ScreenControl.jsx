@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import MonitorsOverview from "./MonitorsOverview";
 import {
@@ -65,6 +66,7 @@ function ScreenControl() {
     send,
     controlledScreen,
     setControlledScreen,
+    lastPush,
   } = useSocket();
 
   const toast = useToast();
@@ -72,6 +74,9 @@ function ScreenControl() {
   const [screen, setScreen] = useState(null);
   const [settings, setSettings] = useState({ ...initialSettings });
   const [baseline, setBaseline] = useState({ ...initialSettings });
+  const [refreshKey, setRefreshKey] = useState(0);
+
+
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -135,7 +140,16 @@ function ScreenControl() {
 
     setSettings(loadedSettings);
     setBaseline(loadedSettings);
+
+  
   }, [controlledScreen]);
+
+
+  // Reload windows whenever the backend confirms a configuration was saved
+  useEffect(() => {
+    if (!lastPush) return;
+    setRefreshKey((k) => k + 1);
+  }, [lastPush]);
 
   // Load LED receiver status from the Electron main process.
   useEffect(() => {
@@ -143,10 +157,10 @@ function ScreenControl() {
 
     const loadReceiverStatus = async () => {
       try {
-        const running = await invoke("get_receiver_status");
+        const status = await invoke("get_receiver_status");
 
         if (active) {
-          setReceiverOn(Boolean(running));
+          setReceiverOn(Boolean(status?.running));
         }
       } catch (error) {
         console.error("Could not load LED UI status:", error);
@@ -240,15 +254,24 @@ function ScreenControl() {
     setSaving(true);
 
     try {
-      send({
+      const sent =send({
         type: "window_update",
         screen_id: screen?.id,
         properties: changedProperties,
       });
 
+      if (!sent) {
+        toast("Socket not open. Settings were not sent.", "error");
+        return; // finally still runs and resets saving
+      }
+
+   
       setBaseline({ ...settings });
 
       toast("Screen settings sent successfully.", "success");
+
+
+      
     } catch (error) {
       console.error("Could not send screen settings:", error);
 
@@ -277,11 +300,10 @@ function ScreenControl() {
           : await invoke("stop_receiver");
 
         if (checked) {
-          // Receiver takes a moment to actually come up.
           setTimeout(async () => {
             try {
-              const running = await invoke("get_receiver_status");
-              setReceiverOn(Boolean(running));
+              const status = await invoke("get_receiver_status");
+              setReceiverOn(Boolean(status?.running));
             } catch {
               setReceiverOn(Boolean(result?.success));
             }
@@ -304,8 +326,8 @@ function ScreenControl() {
         console.error("Failed to toggle LED UI:", error);
 
         try {
-          const running = await invoke("get_receiver_status");
-          setReceiverOn(Boolean(running));
+          const status = await invoke("get_receiver_status");
+          setReceiverOn(Boolean(status?.running));
         } catch {
           // Keep last known state.
         }
@@ -410,12 +432,21 @@ function ScreenControl() {
     return (
       <Box
         sx={{
-          width: "100%",
-          maxWidth: 440,
-          mx: "auto",
-          p: 1.5,
-          boxSizing: "border-box",
-        }}
+  width: "100%",
+  maxWidth: 440,
+  height: "100%",
+  minHeight: 0,
+  mx: "auto",
+  p: 1.5,
+  boxSizing: "border-box",
+  overflowY: "auto",
+  overflowX: "hidden",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none",
+  "&::-webkit-scrollbar": {
+    display: "none",
+  },
+}}
       >
         <Paper
           elevation={0}
@@ -438,13 +469,21 @@ function ScreenControl() {
   return (
     <Box
       sx={{
-        width: "100%",
-        maxWidth: 440,
-        mx: "auto",
-        p: 1.5,
-        boxSizing: "border-box",
-        fontFamily: "Inter, sans-serif",
-      }}
+  width: "100%",
+  maxWidth: 440,
+  height: "100%",
+  minHeight: 0,
+  mx: "auto",
+  p: 1.5,
+  boxSizing: "border-box",
+  overflowY: "auto",
+  overflowX: "hidden",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none",
+  "&::-webkit-scrollbar": {
+    display: "none",
+  },
+}}
     >
       <Paper
         component="section"
@@ -548,7 +587,7 @@ function ScreenControl() {
 
         {/* Connected monitors + content preview */}
         <Box sx={{ mb: 1.75 }}>
-          <MonitorsOverview />
+          <MonitorsOverview  refreshKey={refreshKey}/>
         </Box>
 
         <Divider sx={{ mb: 2 }} />

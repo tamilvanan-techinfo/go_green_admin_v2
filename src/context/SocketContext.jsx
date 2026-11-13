@@ -19,6 +19,7 @@ export function SocketProvider({ children }) {
   const shouldReconnect = useRef(true);
   const reconnectAttempts = useRef(0);
   const reconnectTimeoutRef = useRef(null);
+  const [lastPush, setLastPush] = useState(null);
 
   const connectWebSocket = () => {
     try {
@@ -47,6 +48,11 @@ export function SocketProvider({ children }) {
             // Ack from the screen-control flow (width/height/x/y/fullscreen/alwaysOnTop)
             setControlledScreen(msg.screen);
           }
+          else if (msg.type === "configuration_pushed") {
+            setLastPush({ ...msg, receivedAt: Date.now() });
+          }
+          
+          
         } catch (e) {
           console.error("Error parsing WS message:", e);
         }
@@ -118,7 +124,8 @@ export function SocketProvider({ children }) {
     connected,
     send,
     IsRecOn,
-    setIsRecOn
+    setIsRecOn,
+    lastPush
   };
 
   return (

@@ -10,7 +10,8 @@ import {
   AssessmentRounded,
   Settings,
   Description,
-  TextFields
+  TextFields,
+  NotificationsActiveOutlined
 } from "@mui/icons-material";
 
 import { useLocation, useNavigate } from "react-router-dom";
@@ -418,6 +419,8 @@ function Footer() {
                           ? "iconShine 3s ease-in-out infinite"
                           : "none",
 
+
+
                         pointerEvents: "none",
 
                         "@keyframes iconShine": {
@@ -475,9 +478,10 @@ function Footer() {
                           ? theme.palette.primary.main
                           : theme.palette.text.secondary,
 
+
                         transform:
                           active || hovered
-                            ? "scale(1.10) translateY(-1px)"
+                            ? "scale(1.10) translateY(-1px)   "
                             : "scale(1) translateY(0)",
 
                         transition:

@@ -114,6 +114,8 @@ try {
         "$env:ProgramFiles\GoGreen\GoGreen_BE"
     )
 
+    
+
     $destination = $null
 
     foreach ($candidate in $destinations) {
