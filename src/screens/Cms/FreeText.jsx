@@ -34,7 +34,7 @@ import { useSocket } from '../../context/SocketContext'
 import axios from 'axios'
 import api from '../../config.json'
 
-const DISPLAY_URL = 'http://localhost:1029/#/free-text'
+const DISPLAY_URL = api.displayUrl
 const API_ORIGIN = api.apiBase
 const FREE_TEXT_LOCAL_KEY = 'free_text_editor_state'
 
@@ -56,7 +56,7 @@ const FONT_OPTIONS = [
   ...GOOGLE_FONTS.map(name => ({ value: `"${name}", sans-serif`, label: name, category: 'Google Fonts' })),
 ]
 
-const QUICK_ANNOUNCEMENTS = ['Welcome Greeting', 'Sprint Countdown', 'Award Ceremony']
+const QUICK_ANNOUNCEMENTS = ['Welcome Greeting', 'GO GREEN', 'FANPOWER']
 
 const MAX_LEN = 280
 
@@ -813,6 +813,86 @@ function FreeText() {
           </Box>
 
           {/* ── Inline preview strip ── */}
+
+          {/* ── Inline preview strip ── */}
+{previewText.trim() && (
+  <>
+    <Divider />
+    <Box sx={{ p: 3 }}>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: content ? 'primary.main' : 'text.disabled' }} />
+          <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+            {content ? `Live · ${publishedAt ? formatTime(publishedAt) : ''}` : 'Preview'}
+          </Typography>
+        </Stack>
+        <Stack direction="row" sx={{ gap: 0.5 }}>
+          <Tooltip title="Remove">
+            <IconButton onClick={handleClear} size="small" color="inherit">
+              <DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} />
+            </IconButton>
+          </Tooltip>
+          {content && (
+            <>
+              <Tooltip title="Reload display">
+                <IconButton onClick={handleReload} size="small" color="inherit">
+                  <RefreshRoundedIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Open display window">
+                <IconButton onClick={handleOpenWindow} size="small" color="inherit">
+                  <OpenInNewRoundedIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+        </Stack>
+      </Stack>
+
+      <Box sx={{
+        borderRadius: 2,
+        overflow: 'hidden',
+        border: 1,
+        borderColor: 'divider',
+        aspectRatio: '21 / 9',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: 3,
+        textAlign: 'center',
+        backgroundColor: draftStyle.bgColor,
+        backgroundImage: draftBgImageUrl ? `url(${draftBgImageUrl})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}>
+        <span style={{
+          color: draftStyle.color,
+          fontFamily: draftStyle.fontFamily,
+          fontSize: `${draftStyle.fontSize}px`,
+          fontWeight: 700,
+          lineHeight: 1.2,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          textShadow: draftBgImageUrl ? '0 2px 8px rgba(0,0,0,0.6)' : 'none',
+          textTransform: uppercase ? 'uppercase' : 'none',
+        }}>
+          {previewText}
+        </span>
+      </Box>
+
+      {content && (
+        <Box sx={{ mt: 2, borderRadius: 2, overflow: 'hidden', border: 1, borderColor: 'divider', aspectRatio: '16 / 9', bgcolor: '#000' }}>
+          {isElectron ? (
+            // eslint-disable-next-line react/no-unknown-property
+            <webview key={reloadKey} ref={webviewRef} src={DISPLAY_URL} style={{ width: '100%', height: '100%', border: 'none' }} />
+          ) : (
+            <iframe key={reloadKey} ref={webviewRef} title="Free text display preview" src={DISPLAY_URL} style={{ width: '100%', height: '100%', border: 'none' }} />
+          )}
+        </Box>
+      )}
+    </Box>
+  </>
+)}
           {/* {previewText.trim() && (
             <>
               <Divider />

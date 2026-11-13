@@ -18,8 +18,9 @@ import { useToast } from "../Allocations/Ui";
 const WINDOWS_URL = `${api.apiBase}/screens/windows/?role=admin`;
 
 // Max footprint for a single monitor card in the layout grid.
-const MAX_CARD_WIDTH = 260;
-const MAX_CARD_HEIGHT = 170;
+// const MAX_CARD_WIDTH = 260;
+// const MAX_CARD_HEIGHT = 170;
+const MAX_PREVIEW_HEIGHT = 220;
 
 /**
  * Given a monitor's real resolution and the max box we're allowed to
@@ -40,18 +41,22 @@ function MonitorCard({ monitor, content }) {
   const drawH = Math.round(monH * scale);
 
   // Content rectangle (the actual window) drawn relative to the monitor.
-  const hasContent = Boolean(content);
+  const contentWindows = Array.isArray(content) ? content : [];
 
-  const contentW = hasContent ? Math.round(content.width * scale) : 0;
-  const contentH = hasContent ? Math.round(content.height * scale) : 0;
-  const contentX = hasContent ? Math.round((content.x || 0) * scale) : 0;
-  const contentY = hasContent ? Math.round((content.y || 0) * scale) : 0;
+  const hasContent = contentWindows.length > 0;
 
-  // Leftover space = monitor area not covered by the content window.
   const monitorArea = monW * monH;
-  const contentArea = hasContent ? content.width * content.height : 0;
+
+  const contentArea = contentWindows.reduce(
+    (total, item) => total + item.width * item.height,
+    0
+  );
+
   const leftoverPercent = hasContent
-    ? Math.max(0, Math.round(((monitorArea - contentArea) / monitorArea) * 100))
+    ? Math.max(
+        0,
+        Math.round(((monitorArea - contentArea) / monitorArea) * 100)
+      )
     : 100;
 
   const isFullCoverage = hasContent && leftoverPercent === 0;
@@ -116,42 +121,53 @@ function MonitorCard({ monitor, content }) {
         }}
       >
         {/* Content window, drawn as a nested rect inside the monitor */}
-        {hasContent && (
-          <Tooltip
-            title={`Content: ${content.width} × ${content.height} px`}
-            arrow
-          >
-            <Box
-              sx={{
-                position: "absolute",
-                left: contentX,
-                top: contentY,
-                width: contentW,
-                height: contentH,
-                borderRadius: "3px",
-                bgcolor: isFullCoverage ? "#064E3B" : "#047857",
-                border: "1px solid #34D399",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "all 160ms ease",
-              }}
+        {contentWindows.map((item) => {
+          const contentW = Math.round(item.width * scale);
+          const contentH = Math.round(item.height * scale);
+          const contentX = Math.round(item.x * scale);
+          const contentY = Math.round(item.y * scale);
+
+          return (
+            <Tooltip
+              key={item.id}
+              title={`${item.name}: ${item.width} × ${item.height}px`}
+              arrow
             >
-              <Typography
+              <Box
                 sx={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  color: "#D1FAE5",
-                  textAlign: "center",
-                  px: 0.5,
-                  lineHeight: 1.3,
+                  position: "absolute",
+                  left: contentX,
+                  top: contentY,
+                  width: contentW,
+                  height: contentH,
+                  borderRadius: "3px",
+                  bgcolor: item.fullscreen ? "#064E3B" : "#047857",
+                  border: "1px solid #34D399",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  transition: "all 160ms ease",
                 }}
               >
-                {content.width}×{content.height}
-              </Typography>
-            </Box>
-          </Tooltip>
-        )}
+                <Typography
+                  sx={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: "#D1FAE5",
+                    textAlign: "center",
+                    px: 0.5,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {item.name}
+                  {" "}
+                  {item.width}×{item.height}
+                </Typography>
+              </Box>
+            </Tooltip>
+          );
+        })}
 
         {/* No content placeholder */}
         {!hasContent && (
@@ -230,6 +246,194 @@ function MonitorCard({ monitor, content }) {
   );
 }
 
+
+function CombinedMonitorCard({ monitors, getContentForMonitor }) {
+  if (!monitors.length) return null;
+
+  // Calculate the complete virtual desktop boundaries.
+  const minX = Math.min(...monitors.map((m) => m.x));
+  const minY = Math.min(...monitors.map((m) => m.y));
+
+  const maxX = Math.max(...monitors.map((m) => m.x + m.width));
+  const maxY = Math.max(...monitors.map((m) => m.y + m.height));
+
+  const totalWidth = maxX - minX;
+  const totalHeight = maxY - minY;
+
+  if (totalWidth <= 0 || totalHeight <= 0) return null;
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        width: "100%",
+        minWidth: 0,
+        p: 1.25,
+        borderRadius: "12px",
+        boxSizing: "border-box",
+      }}
+    >
+      {/* Header */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 1 }}
+      >
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          <MonitorRoundedIcon
+            sx={{ fontSize: 16, color: "text.secondary" }}
+          />
+
+          <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
+            Combined Desktop
+          </Typography>
+        </Stack>
+
+        <Chip
+          size="small"
+          label={`${monitors.length} DISPLAY${monitors.length > 1 ? "S" : ""}`}
+          sx={{
+            height: 19,
+            fontSize: 9,
+            fontWeight: 700,
+            bgcolor: "#ECFDF5",
+            color: "#059669",
+          }}
+        />
+      </Stack>
+
+      {/* Combined monitor canvas */}
+      <Box
+        sx={{
+          width: "100%",
+          maxHeight: MAX_PREVIEW_HEIGHT,
+          aspectRatio: `${totalWidth} / ${totalHeight}`,
+          position: "relative",
+          overflow: "hidden",
+          mx: "auto",
+          bgcolor: "#0B1220",
+          border: "2px solid",
+          borderColor: "divider",
+          borderRadius: "7px",
+        }}
+      >
+        {monitors.map((monitor) => {
+          const contentWindows = getContentForMonitor(monitor);
+
+          const left = ((monitor.x - minX) / totalWidth) * 100;
+          const top = ((monitor.y - minY) / totalHeight) * 100;
+
+          const width = (monitor.width / totalWidth) * 100;
+          const height = (monitor.height / totalHeight) * 100;
+
+          return (
+            <Box
+              key={monitor.id}
+              sx={{
+                position: "absolute",
+                left: `${left}%`,
+                top: `${top}%`,
+                width: `${width}%`,
+                height: `${height}%`,
+                boxSizing: "border-box",
+                overflow: "hidden",
+                bgcolor: "#0B1220",
+                border: "1px solid #64748B",
+              }}
+            >
+              {/* Monitor name */}
+              <Typography
+                sx={{
+                  position: "absolute",
+                  top: 3,
+                  left: 3,
+                  zIndex: 2,
+                  fontSize: "clamp(5px, 1.1vw, 9px)",
+                  color: "#CBD5E1",
+                  bgcolor: "rgba(15,23,42,0.8)",
+                  px: 0.4,
+                  borderRadius: "2px",
+                  maxWidth: "90%",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {monitor.label}
+                {monitor.isPrimary ? " (Primary)" : ""}
+              </Typography>
+
+              {/* Windows positioned relative to this monitor */}
+              {contentWindows.map((item) => (
+                <Tooltip
+                  key={item.id}
+                  title={`${item.name}: ${item.width} × ${item.height}px`}
+                  arrow
+                >
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      left: `${(item.x / monitor.width) * 100}%`,
+                      top: `${(item.y / monitor.height) * 100}%`,
+                      width: `${(item.width / monitor.width) * 100}%`,
+                      height: `${(item.height / monitor.height) * 100}%`,
+                      boxSizing: "border-box",
+                      bgcolor: item.fullscreen ? "#064E3B" : "#047857",
+                      border: "1px solid #34D399",
+                      borderRadius: "3px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: "clamp(5px, 1vw, 9px)",
+                        fontWeight: 700,
+                        color: "#D1FAE5",
+                        textAlign: "center",
+                        overflow: "hidden",
+                        px: 0.25,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {item.name}
+                    </Typography>
+                  </Box>
+                </Tooltip>
+              ))}
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* Combined resolution */}
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ mt: 1 }}
+      >
+        <Typography
+          sx={{
+            fontSize: 10,
+            fontWeight: 700,
+            fontFamily: '"JetBrains Mono", monospace',
+          }}
+        >
+          Desktop: {totalWidth} × {totalHeight}
+        </Typography>
+
+        <Typography sx={{ fontSize: 9, color: "text.secondary" }}>
+          {monitors.length} connected
+        </Typography>
+      </Stack>
+    </Paper>
+  );
+}
+
 function MonitorsOverview({ refreshKey = 0 }) {
   const toast = useToast();
   const [monitors, setMonitors] = useState([]);
@@ -303,79 +507,79 @@ function MonitorsOverview({ refreshKey = 0 }) {
 
     useEffect(() => {
     loadAll();
-
-    }, []);
-
-
-
-
-    // Apply pushed values straight to the preview, no refetch needed
-    useEffect(() => {
-      const onPushed = (e) => {
-        const { window_id, properties } = e.detail || {};
-        if (!properties) return;
-
-        const x = Number(properties.x ?? 0);
-        const y = Number(properties.y ?? 0);
-        const width = Number(properties.width);
-        const height = Number(properties.height);
-
-        setWindows((prev) => {
-          const sameWindow = (w) =>
-            Number(w.id ?? w.window_id) === Number(window_id);
-
-          if (!prev.some(sameWindow)) {
-            return [...prev, { id: window_id, position_details: { x, y, width, height } }];
-          }
-
-          return prev.map((w) =>
-            sameWindow(w)
-              ? { ...w, position_details: { ...w.position_details, x, y, width, height } }
-              : w
-          );
-        });
-      };
-
-      window.addEventListener("window-config-pushed", onPushed);
-      return () => window.removeEventListener("window-config-pushed", onPushed);
-    }, []);
+    // const interval = setInterval(() => loadWindows().then(setWindows), 1000);
+    // return () => clearInterval(interval);
+    }, [loadAll, refreshKey]);
 
   // Match each monitor to whichever window is currently assigned to
   // its Screen (first active window found, if any).
-    const contentForMonitor = (monitor) => {
+  const contentForMonitor = (monitor) => {
     const monLeft = monitor.x;
     const monTop = monitor.y;
     const monRight = monitor.x + monitor.width;
     const monBottom = monitor.y + monitor.height;
 
-    const match = windows.find((w) => {
-        const pos = w?.position_details;
+    return windows
+      .filter((window) => {
+        if (window.is_active === false) return false;
+
+        const pos = window?.position_details;
+
         if (!pos) return false;
 
-        const winX = pos.x ?? 0;
-        const winY = pos.y ?? 0;
+        const x = Number(pos.x ?? 0);
+        const y = Number(pos.y ?? 0);
+        const width = Number(pos.width ?? 0);
+        const height = Number(pos.height ?? 0);
 
-        // Window's top-left corner falls inside this monitor's bounds.
+        if (
+          !Number.isFinite(x) ||
+          !Number.isFinite(y) ||
+          width <= 0 ||
+          height <= 0
+        ) {
+          return false;
+        }
+
+        // A window is assigned to a monitor only if its entire
+        // rectangle fits inside that monitor.
         return (
-        winX >= monLeft &&
-        winX < monRight &&
-        winY >= monTop &&
-        winY < monBottom
+          x >= monLeft &&
+          y >= monTop &&
+          x + width <= monRight &&
+          y + height <= monBottom
         );
-    });
+      })
+      .map((window) => {
+        const pos = window.position_details;
 
-    if (!match?.position_details) return null;
+        const width = Number(pos.width);
+        const height = Number(pos.height);
 
-    const pos = match.position_details;
-    return {
-        width: pos.width,
-        height: pos.height,
-        // Report position relative to the monitor's own origin, not the
-        // virtual desktop's global origin — needed for correct drawing.
-        x: (pos.x ?? 0) - monLeft,
-        y: (pos.y ?? 0) - monTop,
-    };
-    };
+        // Fullscreen windows occupy the whole monitor visually.
+        if (pos.fullscreen) {
+          return {
+            id: window.id,
+            name: window.name,
+            x: 0,
+            y: 0,
+            width: monitor.width,
+            height: monitor.height,
+            fullscreen: true,
+          };
+        }
+
+        return {
+          id: window.id,
+          name: window.name,
+          x: Number(pos.x ?? 0) - monLeft,
+          y: Number(pos.y ?? 0) - monTop,
+          width,
+          height,
+          fullscreen: false,
+        };
+      });
+  };
 
   if (loading) {
     return (
@@ -415,7 +619,12 @@ function MonitorsOverview({ refreshKey = 0 }) {
         CONNECTED MONITORS
       </Typography>
 
-      <Stack
+      <CombinedMonitorCard
+        monitors={monitors}
+        getContentForMonitor={contentForMonitor}
+      />
+
+      {/* <Stack
         direction="row"
         flexWrap="wrap"
         gap={1.5}
@@ -428,7 +637,7 @@ function MonitorsOverview({ refreshKey = 0 }) {
             content={contentForMonitor(monitor)}
           />
         ))}
-      </Stack>
+      </Stack> */}
     </Box>
   );
 }

@@ -7,7 +7,7 @@ import Allocations from "../screens/Allocations/Allocations";
 import Logs from "../screens/Logs/Logs";
 import ScreenManager from "../screens/ScreenManager/ScreenManager";
 import  Settings  from "../screens/Settings/Settings";
-import Reports from "../screens/Reports";
+import Reports from "../screens/Reports/Reports";
 import Cms from "../screens/Cms/Cms";
 import ManualScoring from "../screens/ManualScoring";
 

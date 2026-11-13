@@ -23,46 +23,31 @@ import {
   Grid,
   IconButton,
   InputAdornment,
-  MenuItem,
   Paper,
   Skeleton,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Tooltip,
   Typography,
- 
+  useMediaQuery,
 } from "@mui/material";
 
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 
-import { COMPACT} from '../../components/Layout'
+import { COMPACT } from "../../components/Layout";
 
-
-import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
+import DirectionsBikeIcon from "@mui/icons-material/DirectionsBike";
 import SyncIcon from "@mui/icons-material/Sync";
 import PauseCircleIcon from "@mui/icons-material/PauseCircle";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import EditNoteIcon from "@mui/icons-material/EditNote";
 import CloseIcon from "@mui/icons-material/Close";
 import SaveIcon from "@mui/icons-material/Save";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
-import {
-  api,
-  useToast,
-  Pager,
-} from "./Ui";
-
-
+import { api, useToast, Pager } from "./Ui";
 
 const EMPTY = {
   id: null,
@@ -72,29 +57,26 @@ const EMPTY = {
 
 /* =========================================================
    KPI CARD
+   — shrinks again at `lg` (laptop widths, ~1200–1536px) so it
+     doesn't eat the same vertical space it does on a big
+     monitor, then grows back at `xl`; stacks into a horizontal
+     scroller on phones (swiggy-style chip row)
    ========================================================= */
 
-function KpiCard({
-  label,
-  value,
-  hint,
-  icon,
-  loading,
-  color = "primary",
-}) {
+function KpiCard({ label, value, hint, icon, loading, color = "primary" }) {
   const iconMap = {
     directions_bike: DirectionsBikeIcon,
     sync: SyncIcon,
     pause_circle: PauseCircleIcon,
   };
 
-  const IconComponent =
-    iconMap[icon] || DirectionsBikeIcon;
+  const IconComponent = iconMap[icon] || DirectionsBikeIcon;
 
   return (
     <Card
       sx={{
         height: "100%",
+        minWidth: { xs: 180, sm: "auto" },
         borderLeft: "4px solid",
         borderLeftColor: `${color}.main`,
         backgroundColor: (theme) => alpha(theme.palette[color].main, 0.07),
@@ -102,8 +84,8 @@ function KpiCard({
     >
       <CardContent
         sx={{
-          p: 2.5,
-          "&:last-child": { pb: 2.5 },
+          p: { xs: 1.75, sm: 2.5, lg: 1.5, xl: 2.5 },
+          "&:last-child": { pb: { xs: 1.75, sm: 2.5, lg: 1.5, xl: 2.5 } },
           position: "relative",
         }}
       >
@@ -111,36 +93,40 @@ function KpiCard({
         <Box
           sx={{
             position: "absolute",
-            top: 16,
-            right: 16,
-            width: 44,
-            height: 44,
+            top: { xs: 10, sm: 16, lg: 10, xl: 16 },
+            right: { xs: 10, sm: 16, lg: 10, xl: 16 },
+            width: { xs: 34, sm: 44, lg: 32, xl: 44 },
+            height: { xs: 34, sm: 44, lg: 32, xl: 44 },
             borderRadius: 2,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: `${color}.main`,
-            backgroundColor: (theme) =>
-              alpha(theme.palette[color].main, 0.12),
+            backgroundColor: (theme) => alpha(theme.palette[color].main, 0.12),
+            "& svg": { fontSize: { xs: 18, sm: 24, lg: 16, xl: 24 } },
           }}
         >
           <IconComponent />
         </Box>
 
-        <Box sx={{ pr: 7 }}>
+        <Box sx={{ pr: { xs: 5, sm: 7, lg: 5, xl: 7 } }}>
           <Typography
             variant="overline"
-            sx={{ display: "block", mb: 0.5 }}
+            sx={{ display: "block", mb: 0.5, fontSize: { xs: 10, sm: 11, lg: 10, xl: 11 } }}
           >
             {label}
           </Typography>
 
           {loading ? (
-            <Skeleton variant="text" width={80} height={52} />
+            <Skeleton variant="text" width={60} height={40} />
           ) : (
             <Typography
               variant="h3"
-              sx={{ lineHeight: 1.1, fontWeight: 700 }}
+              sx={{
+                lineHeight: 1.1,
+                fontWeight: 700,
+                fontSize: { xs: "1.75rem", sm: "2.5rem", lg: "1.6rem", xl: "2.5rem" },
+              }}
             >
               {value}
             </Typography>
@@ -149,7 +135,12 @@ function KpiCard({
           {hint && (
             <Typography
               variant="overline"
-              sx={{ display: "block", mt: 0.5, color: `${color}.main` }}
+              sx={{
+                display: "block",
+                mt: 0.5,
+                fontSize: { xs: 9, sm: 11, lg: 9, xl: 11 },
+                color: `${color}.main`,
+              }}
             >
               {hint}
             </Typography>
@@ -161,36 +152,117 @@ function KpiCard({
 }
 
 /* =========================================================
-   PAGINATION
+   MOBILE ROW — card representation of a cycle (below `lg`)
    ========================================================= */
 
+function CycleCard({ c, allocated, onEdit, onDelete }) {
+  return (
+    <Paper
+      variant="outlined"
+      onClick={onEdit}
+      sx={{
+        p: 1.5,
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+        cursor: "pointer",
+        "&:active": { bgcolor: "action.selected" },
+      }}
+    >
+      <Box
+        sx={{
+          width: 40,
+          height: 40,
+          flexShrink: 0,
+          borderRadius: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: "action.hover",
+          color: "text.secondary",
+        }}
+      >
+        <DirectionsBikeIcon fontSize="small" />
+      </Box>
 
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Box
+            component="span"
+            sx={{
+              display: "inline-flex",
+              px: 1,
+              py: 0.3,
+              borderRadius: 1,
+              backgroundColor: "action.hover",
+              color: "text.primary",
+              fontFamily: '"JetBrains Mono", monospace',
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "100%",
+            }}
+          >
+            {c.cycle_no}
+          </Box>
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {c.controller_no}
+          </Typography>
+          <Chip
+            size="small"
+            label={allocated ? "Allocated" : "Unallocated"}
+            color={allocated ? "success" : "default"}
+            variant={allocated ? "filled" : "outlined"}
+            sx={{ height: 20, fontSize: 11, flexShrink: 0 }}
+          />
+        </Stack>
+      </Box>
 
+      <Stack direction="row" spacing={0.5}>
+        <IconButton
+          size="small"
+          aria-label={`Edit ${c.cycle_no}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+        >
+          <EditIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          color="error"
+          aria-label={`Delete ${c.cycle_no}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+    </Paper>
+  );
+}
 
 /* =========================================================
    CONFIRM DELETE DIALOG
    ========================================================= */
 
-function DeleteCycleDialog({
-  open,
-  cycle,
-  busy,
-  onConfirm,
-  onCancel,
-}) {
+function DeleteCycleDialog({ open, cycle, busy, onConfirm, onCancel }) {
   return (
-    <Dialog
-      open={open}
-      onClose={busy ? undefined : onCancel}
-      maxWidth="xs"
-      fullWidth
-    >
+    <Dialog open={open} onClose={busy ? undefined : onCancel} maxWidth="xs" fullWidth>
       <DialogTitle>
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={1.5}
-        >
+        <Stack direction="row" alignItems="center" spacing={1.5}>
           <Box
             sx={{
               width: 38,
@@ -200,43 +272,26 @@ function DeleteCycleDialog({
               alignItems: "center",
               justifyContent: "center",
               color: "error.main",
-              backgroundColor: (theme) =>
-                alpha(theme.palette.error.main, 0.1),
+              backgroundColor: (theme) => alpha(theme.palette.error.main, 0.1),
             }}
           >
             <WarningAmberIcon fontSize="small" />
           </Box>
 
-          <Typography
-            component="span"
-            variant="h6"
-          >
+          <Typography component="span" variant="h6">
             Delete cycle?
           </Typography>
         </Stack>
       </DialogTitle>
 
       <DialogContent>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-        >
-          <strong>{cycle?.cycle_no}</strong> will be
-          removed. This action cannot be undone.
+        <Typography variant="body2" color="text.secondary">
+          <strong>{cycle?.cycle_no}</strong> will be removed. This action cannot be undone.
         </Typography>
       </DialogContent>
 
-      <DialogActions
-        sx={{
-          px: 3,
-          pb: 2.5,
-        }}
-      >
-        <Button
-          variant="outlined"
-          onClick={onCancel}
-          disabled={busy}
-        >
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button variant="outlined" onClick={onCancel} disabled={busy}>
           Cancel
         </Button>
 
@@ -245,16 +300,7 @@ function DeleteCycleDialog({
           color="error"
           onClick={onConfirm}
           disabled={busy}
-          startIcon={
-            busy ? (
-              <CircularProgress
-                size={16}
-                color="inherit"
-              />
-            ) : (
-              <DeleteIcon />
-            )
-          }
+          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
         >
           {busy ? "Deleting..." : "Delete"}
         </Button>
@@ -269,11 +315,14 @@ function DeleteCycleDialog({
 
 function CycleSection({ onDataChange }) {
   const toast = useToast();
+  const theme = useTheme();
+
+  // breakpoints — same pattern as ParticipantSection
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // < 600
+  const isTablet = useMediaQuery(theme.breakpoints.down("lg")); // < 1200
 
   const [cycles, setCycles] = useState([]);
-  const [allocatedIds, setAllocatedIds] = useState(
-    new Set()
-  );
+  const [allocatedIds, setAllocatedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
   const [query, setQuery] = useState("");
@@ -285,8 +334,7 @@ function CycleSection({ onDataChange }) {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
-  const [deleteTarget, setDeleteTarget] =
-    useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
   /* =======================================================
@@ -304,20 +352,11 @@ function CycleSection({ onDataChange }) {
     if (c.ok) {
       setCycles(c.data.data || []);
     } else {
-      toast(
-        c.data.message || "Failed to load cycles",
-        "error"
-      );
+      toast(c.data.message || "Failed to load cycles", "error");
     }
 
     if (a.ok) {
-      setAllocatedIds(
-        new Set(
-          (a.data.data || []).map(
-            (x) => x.cycle
-          )
-        )
-      );
+      setAllocatedIds(new Set((a.data.data || []).map((x) => x.cycle)));
     }
 
     setLoading(false);
@@ -340,71 +379,38 @@ function CycleSection({ onDataChange }) {
 
     return cycles.filter(
       (c) =>
-        String(c.cycle_no)
-          .toLowerCase()
-          .includes(q) ||
-        String(c.controller_no)
-          .toLowerCase()
-          .includes(q)
+        String(c.cycle_no).toLowerCase().includes(q) ||
+        String(c.controller_no).toLowerCase().includes(q)
     );
   }, [cycles, query]);
 
-  const rows = filtered.slice(
-  page * pageSize,
-  (page + 1) * pageSize
-  );
+  const rows = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
-  const allocatedCount = cycles.filter((c) =>
-    allocatedIds.has(c.id)
-  ).length;
+  const allocatedCount = cycles.filter((c) => allocatedIds.has(c.id)).length;
 
   /* =======================================================
      DUPLICATE CHECK
      ======================================================= */
 
   const dup = useMemo(() => {
-    const no = form.cycle_no
-      .trim()
-      .toLowerCase();
+    const no = form.cycle_no.trim().toLowerCase();
+    const ctrl = form.controller_no.trim().toLowerCase();
 
-    const ctrl = form.controller_no
-      .trim()
-      .toLowerCase();
-
-    const others = cycles.filter(
-      (c) => c.id !== form.id
-    );
+    const others = cycles.filter((c) => c.id !== form.id);
 
     return {
-      cycle_no:
-        !!no &&
-        others.some(
-          (c) =>
-            String(c.cycle_no)
-              .toLowerCase() === no
-        ),
-
+      cycle_no: !!no && others.some((c) => String(c.cycle_no).toLowerCase() === no),
       controller_no:
-        !!ctrl &&
-        others.some(
-          (c) =>
-            String(c.controller_no)
-              .toLowerCase() === ctrl
-        ),
+        !!ctrl && others.some((c) => String(c.controller_no).toLowerCase() === ctrl),
     };
   }, [cycles, form]);
 
   const cycleNoError =
-    errors.cycle_no ||
-    (dup.cycle_no
-      ? `"${form.cycle_no.trim()}" already exists`
-      : "");
+    errors.cycle_no || (dup.cycle_no ? `"${form.cycle_no.trim()}" already exists` : "");
 
   const controllerError =
     errors.controller_no ||
-    (dup.controller_no
-      ? `"${form.controller_no.trim()}" already exists`
-      : "");
+    (dup.controller_no ? `"${form.controller_no.trim()}" already exists` : "");
 
   /* =======================================================
      PANEL HANDLERS
@@ -437,16 +443,9 @@ function CycleSection({ onDataChange }) {
   const onField = (e) => {
     const { name, value } = e.target;
 
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: value }));
 
-    setErrors((prev) => ({
-      ...prev,
-      [name]: undefined,
-      form: undefined,
-    }));
+    setErrors((prev) => ({ ...prev, [name]: undefined, form: undefined }));
   };
 
   /* =======================================================
@@ -457,24 +456,20 @@ function CycleSection({ onDataChange }) {
     e?.preventDefault();
 
     const cycle_no = form.cycle_no.trim();
-    const controller_no =
-      form.controller_no.trim();
+    const controller_no = form.controller_no.trim();
 
     const next = {};
 
     if (!cycle_no) {
       next.cycle_no = "Cycle No is required";
     } else if (dup.cycle_no) {
-      next.cycle_no =
-        `"${cycle_no}" already exists`;
+      next.cycle_no = `"${cycle_no}" already exists`;
     }
 
     if (!controller_no) {
-      next.controller_no =
-        "Controller No is required";
+      next.controller_no = "Controller No is required";
     } else if (dup.controller_no) {
-      next.controller_no =
-        `"${controller_no}" already exists`;
+      next.controller_no = `"${controller_no}" already exists`;
     }
 
     if (Object.keys(next).length) {
@@ -488,15 +483,10 @@ function CycleSection({ onDataChange }) {
     const isEdit = !!form.id;
 
     const { ok, data } = await api(
-      isEdit
-        ? `/api/admin/cycles/${form.id}/`
-        : "/api/admin/cycles/",
+      isEdit ? `/api/admin/cycles/${form.id}/` : "/api/admin/cycles/",
       {
         method: isEdit ? "PUT" : "POST",
-        json: {
-          cycle_no,
-          controller_no,
-        },
+        json: { cycle_no, controller_no },
       }
     );
 
@@ -504,31 +494,17 @@ function CycleSection({ onDataChange }) {
 
     if (!ok) {
       if (data.errors?.cycle_no) {
-        setErrors({
-          cycle_no:
-            `"${cycle_no}" already exists`,
-        });
+        setErrors({ cycle_no: `"${cycle_no}" already exists` });
       } else if (data.errors?.controller_no) {
-        setErrors({
-          controller_no:
-            `"${controller_no}" already exists`,
-        });
+        setErrors({ controller_no: `"${controller_no}" already exists` });
       } else {
-        setErrors({
-          form:
-            data.message ||
-            "Failed to save cycle",
-        });
+        setErrors({ form: data.message || "Failed to save cycle" });
       }
 
       return;
     }
 
-    toast(
-      isEdit
-        ? `${cycle_no} updated`
-        : `${cycle_no} created`
-    );
+    toast(isEdit ? `${cycle_no} updated` : `${cycle_no} created`);
 
     closePanel();
 
@@ -544,12 +520,9 @@ function CycleSection({ onDataChange }) {
   const confirmDelete = async () => {
     setDeleting(true);
 
-    const { ok, data } = await api(
-      `/api/admin/cycles/${deleteTarget.id}/`,
-      {
-        method: "DELETE",
-      }
-    );
+    const { ok, data } = await api(`/api/admin/cycles/${deleteTarget.id}/`, {
+      method: "DELETE",
+    });
 
     setDeleting(false);
 
@@ -558,10 +531,7 @@ function CycleSection({ onDataChange }) {
     setDeleteTarget(null);
 
     if (!ok) {
-      toast(
-        data.message || "Failed to delete cycle",
-        "error"
-      );
+      toast(data.message || "Failed to delete cycle", "error");
       return;
     }
 
@@ -581,37 +551,46 @@ function CycleSection({ onDataChange }) {
      ======================================================= */
 
   return (
-    <Stack spacing={2}
+    <Stack
+      spacing={{ xs: 1.5, sm: 2, lg: 1.25, xl: 2 }}
       sx={{
-      width: "100%",
-      height: "100%",
-      minHeight: 0,
-      boxSizing: "border-box",
-      overflow: "hidden",
-      [COMPACT]: { height: "auto", overflow: "visible" },
-      }}>
+        width: "100%",
+        height: isTablet ? "auto" : "100%",
+        minHeight: 0,
+        boxSizing: "border-box",
+        overflow: isTablet ? "visible" : "hidden",
+        [COMPACT]: { height: "auto", overflow: "visible" },
+      }}
+    >
       {/* ===================================================
           KPIs
+          — scrollable row of fixed-width cards on phones,
+            a normal 3-up grid from sm upward
           =================================================== */}
 
-      <Grid
-        container
-        spacing={2}
+      <Box
         sx={{
-          width: "100%",
+          display: { xs: "flex", sm: "grid" },
+          gridTemplateColumns: { sm: "repeat(3, 1fr)" },
+          gap: { xs: 2, lg: 1.25, xl: 2 },
+          overflowX: { xs: "auto", sm: "visible" },
+          scrollSnapType: { xs: "x mandatory", sm: "none" },
+          pb: { xs: 0.5, sm: 0 },
+          "&::-webkit-scrollbar": { display: "none" },
+          scrollbarWidth: "none",
         }}
       >
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Box sx={{ flex: { xs: "0 0 72%", sm: "auto" }, scrollSnapAlign: "start" }}>
           <KpiCard
             label="Total cycles"
             value={cycles.length}
-            icon="precision_manufacturing"
+            icon="directions_bike"
             loading={loading}
             color="primary"
           />
-        </Grid>
+        </Box>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Box sx={{ flex: { xs: "0 0 72%", sm: "auto" }, scrollSnapAlign: "start" }}>
           <KpiCard
             label="Allocated"
             value={allocatedCount}
@@ -620,24 +599,26 @@ function CycleSection({ onDataChange }) {
             loading={loading}
             color="success"
           />
-        </Grid>
+        </Box>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Box sx={{ flex: { xs: "0 0 72%", sm: "auto" }, scrollSnapAlign: "start" }}>
           <KpiCard
             label="Unallocated"
-            value={
-              cycles.length - allocatedCount
-            }
+            value={cycles.length - allocatedCount}
             hint="AVAILABLE"
             icon="pause_circle"
             loading={loading}
             color="warning"
           />
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* ===================================================
           MAIN CONTENT
+          — below `lg` the layout flows normally (auto height,
+            page scrolls) instead of being boxed into a fixed
+            height, and the inspector always stays visible,
+            stacked full-width under the list
           =================================================== */}
 
       <Grid
@@ -646,141 +627,139 @@ function CycleSection({ onDataChange }) {
         alignItems="stretch"
         sx={{
           width: "100%",
-          flex: "1 1 0",
+          flex: isTablet ? "0 0 auto" : "1 1 0",
           minHeight: 0,
           display: "flex",
           alignItems: "stretch",
-          overflow: "hidden",
+          overflow: isTablet ? "visible" : "hidden",
           [COMPACT]: { flex: "0 0 auto", overflow: "visible" },
         }}
       >
         {/* =================================================
-            TABLE
+            TABLE / LIST COLUMN — full width below `lg`
             ================================================= */}
 
         <Grid
           size={{ xs: 12, lg: 8 }}
           sx={{
-        
             minWidth: 0,
             minHeight: 0,
-            height: "100%",
+            height: isTablet ? "auto" : "100%",
             display: "flex",
             flexDirection: "column",
-            overflow: "hidden",
+            overflow: isTablet ? "visible" : "hidden",
             [COMPACT]: { height: "auto", overflow: "visible" },
           }}
         >
           <Stack
-            spacing={2}
+            spacing={{ xs: 1.5, sm: 2 }}
             sx={{
-              flex: "1 1 0",
+              flex: isTablet ? "0 0 auto" : "1 1 0",
               minWidth: 0,
               minHeight: 0,
-              height: "100%",
+              height: isTablet ? "auto" : "100%",
               display: "flex",
               flexDirection: "column",
-              overflow: "hidden",
+              overflow: isTablet ? "visible" : "hidden",
               [COMPACT]: { flex: "0 0 auto", height: "auto", overflow: "visible" },
             }}
           >
-          
+            {/* TABLE HEADER / TOOLBAR */}
 
-{/* TABLE HEADER */}
+            <Paper
+              sx={{
+                p: { xs: 1.5, sm: 2, lg: 1.25, xl: 2 },
+                border: 1,
+                borderColor: "divider",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              <Stack spacing={{ xs: 1.5, lg: 1, xl: 1.5 }}>
+                {/* Title row */}
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  justifyContent="space-between"
+                >
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography
+                      sx={{ fontSize: { lg: "1.1rem", xl: "1.5rem" } }}
+                      variant={isMobile ? "h6" : "h5"}
+                    >
+                      Cycles
+                    </Typography>
 
-<Paper
-  sx={{
-    p: 2,
-    border: 1,
-    borderColor: "divider",
-    width: "100%",
-    boxSizing: "border-box",
-    
-  }}
->
-  <Box
-    sx={{
-      display: "flex",
-      flexDirection: { xs: "column", sm: "row" },
-      alignItems: { xs: "stretch", sm: "center" },
-      width: "100%",
-      gap: 2,
-    }}
-  >
-    {/* LEFT: TITLE AND COUNT */}
-    <Stack
-      direction="row"
-      spacing={1}
-      alignItems="center"
-      sx={{ flexShrink: 0 }}
-    >
-      <Typography variant="h5">
-        Cycles
-      </Typography>
+                    <Chip label={`${cycles.length} total`} size="small" variant="outlined" />
+                  </Stack>
 
-      <Chip
-        label={`${cycles.length} total`}
-        size="small"
-        variant="outlined"
-      />
-    </Stack>
+                  {/* On phones, "New cycle" collapses to a round icon
+                      button next to the title so the toolbar stays on
+                      one line */}
+                  {isMobile && (
+                    <IconButton
+                      color="primary"
+                      onClick={openNew}
+                      aria-label="New cycle"
+                      sx={{
+                        bgcolor: "primary.main",
+                        color: "primary.contrastText",
+                        "&:hover": { bgcolor: "primary.dark" },
+                      }}
+                    >
+                      <AddIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </Stack>
 
-    {/* RIGHT: SEARCH AND NEW CYCLE BUTTON */}
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: { xs: "column", sm: "row" },
-        alignItems: { xs: "stretch", sm: "center" },
-        justifyContent: { xs: "flex-start", sm: "flex-end" },
-        gap: 1,
-        ml: { xs: 0, sm: "auto" },
-        width: { xs: "100%", sm: "auto" },
-      }}
-    >
-      <TextField
-        type="search"
-        size="small"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setPage(0);
-        }}
-        placeholder="Search cycles..."
-        aria-label="Search cycles"
-        sx={{
-          width: { xs: "100%", sm: 240 },
-        }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon fontSize="small" />
-            </InputAdornment>
-          ),
-        }}
-      />
+                {/* Search + new cycle, wraps freely */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: { xs: "column", sm: "row" },
+                    alignItems: { xs: "stretch", sm: "center" },
+                    gap: 1,
+                  }}
+                >
+                  <TextField
+                    type="search"
+                    size="small"
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setPage(0);
+                    }}
+                    placeholder="Search cycles..."
+                    aria-label="Search cycles"
+                    fullWidth
+                    sx={{ maxWidth: { sm: 280 } }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
 
-      <Button
-        type="button"
-        variant="contained"
-        color="primary"
-        startIcon={<AddIcon />}
-        onClick={openNew}
-        sx={{
-          flexShrink: 0,
-          whiteSpace: "nowrap",
-        }}
-      >
-        New cycle
-      </Button>
-    </Box>
-  </Box>
-</Paper>
+                  {!isMobile && (
+                    <Button
+                      type="button"
+                      variant="contained"
+                      color="primary"
+                      startIcon={<AddIcon />}
+                      onClick={openNew}
+                      sx={{ flexShrink: 0, whiteSpace: "nowrap", ml: { sm: "auto" } }}
+                    >
+                      New cycle
+                    </Button>
+                  )}
+                </Box>
+              </Stack>
+            </Paper>
 
-
-
-
-
-            {/* TABLE */}
+            {/* LIST — table from `lg` up, card list below it */}
 
             <Paper
               sx={{
@@ -788,300 +767,237 @@ function CycleSection({ onDataChange }) {
                 borderColor: "divider",
                 display: "flex",
                 flexDirection: "column",
-                flex: "1 1 0",
+                flex: isTablet ? "0 0 auto" : "1 1 0",
                 minHeight: 0,
                 minWidth: 0,
-                overflow: "hidden",
+                overflow: isTablet ? "visible" : "hidden",
                 [COMPACT]: { flex: "0 0 auto" },
               }}
             >
-              <TableContainer
+              <Box
                 sx={{
-                  flex: 1,
+                  flex: isTablet ? "0 0 auto" : 1,
                   minHeight: 0,
-                  overflowY: "auto",
+                  maxHeight: isTablet ? "none" : undefined,
+                  overflowY: isTablet ? "visible" : "auto",
                   overflowX: "auto",
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
-                  "&::-webkit-scrollbar": {
-                  display: "none",
-                  },
+                  "&::-webkit-scrollbar": { display: "none" },
                   [COMPACT]: { flex: "0 0 auto", maxHeight: 420 },
-                  }}
+                }}
               >
-                <Table sx={{ minWidth: 520 }}>
-                  
+                {/* LOADING */}
+                {loading && cycles.length === 0 && (
+                  <Stack spacing={1} sx={{ p: 1.5 }}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <Skeleton key={i} variant="rounded" height={isMobile ? 64 : 22} />
+                    ))}
+                  </Stack>
+                )}
 
-<TableHead>
-  <TableRow>
-    <TableCell sx={{ width: 80 }}>ID</TableCell>
-    <TableCell>Cycle No</TableCell>
-    <TableCell>Controller No</TableCell>
-    <TableCell>State</TableCell>
-    <TableCell
-      align="right"
-      sx={{
-        width: 110,
-        minWidth: 110,
-        whiteSpace: "nowrap",
-      }}
-    >
-      Actions
-    </TableCell>
-  </TableRow>
-</TableHead>
+                {/* NO CYCLES */}
+                {!loading && cycles.length === 0 && (
+                  <Stack alignItems="center" spacing={1} sx={{ py: 8, px: 2 }}>
+                    <DirectionsBikeIcon sx={{ fontSize: 36, color: "text.disabled" }} />
+                    <Typography variant="h6">No cycles yet</Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 1, textAlign: "center" }}
+                    >
+                      Add your first cycle with its controller number.
+                    </Typography>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>
+                      New cycle
+                    </Button>
+                  </Stack>
+                )}
 
-                  <TableBody>
-                    {/* LOADING */}
+                {/* NO SEARCH RESULTS */}
+                {!loading && cycles.length > 0 && filtered.length === 0 && (
+                  <Box sx={{ py: 8, textAlign: "center" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No cycles match "{query}".
+                    </Typography>
+                  </Box>
+                )}
 
-                    {loading &&
-                      cycles.length === 0 &&
-                      [0, 1, 2, 3].map((i) => (
-                        <TableRow key={i}>
-                          <TableCell colSpan={5}>
-                            <Skeleton
-                              variant="rounded"
-                              height={22}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                {/* MOBILE / TABLET — card list, below `lg` */}
+                {isTablet && rows.length > 0 && (
+                  <Stack spacing={1} sx={{ p: 1.5 }}>
+                    {rows.map((c) => (
+                      <CycleCard
+                        key={c.id}
+                        c={c}
+                        allocated={allocatedIds.has(c.id)}
+                        onEdit={() => openEdit(c)}
+                        onDelete={() => setDeleteTarget(c)}
+                      />
+                    ))}
+                  </Stack>
+                )}
 
-                    {/* NO CYCLES */}
-
-                    {!loading &&
-                      cycles.length === 0 && (
-                        <TableRow>
-                          <TableCell
-                            colSpan={5}
-                            sx={{
-                              py: 8,
-                            }}
-                          >
-                            <Stack
-                              alignItems="center"
-                              spacing={1}
-                            >
-                              <DirectionsBikeIcon
-                                sx={{
-                                  fontSize: 36,
-                                  color:
-                                    "text.disabled",
-                                }}
-                              />
-
-                              <Typography variant="h6">
-                                No cycles yet
-                              </Typography>
-
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  mb: 1,
-                                  textAlign: "center",
-                                }}
-                              >
-                                Add your first cycle
-                                with its controller
-                                number.
-                              </Typography>
-
-                              <Button
-                                variant="contained"
-                                startIcon={
-                                  <AddIcon />
-                                }
-                                onClick={openNew}
-                              >
-                                New cycle
-                              </Button>
-                            </Stack>
-                          </TableCell>
-                        </TableRow>
-                      )}
-
-                    {/* NO SEARCH RESULTS */}
-
-                    {!loading &&
-                      cycles.length > 0 &&
-                      filtered.length === 0 && (
-                        <TableRow>
-                          <TableCell
-                            colSpan={5}
-                            sx={{
-                              py: 8,
-                              textAlign: "center",
-                            }}
-                          >
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                            >
-                              No cycles match “
-                              {query}”.
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
-
-                    {/* ROWS */}
-
-                    {rows.map((c) => {
-                      const selected =
-                        form.id === c.id &&
-                        panel === "edit";
-
-                      const allocated =
-                        allocatedIds.has(c.id);
-
-                      return (
-                        <TableRow
-                          key={c.id}
-                          hover
-                          selected={selected}
-                          onClick={() =>
-                            openEdit(c)
-                          }
-                          sx={{
-                            cursor: "pointer",
-                          }}
+                {/* DESKTOP — full table, `lg` and up */}
+                {!isTablet && rows.length > 0 && (
+                  <Box component="table" sx={{ width: "100%", minWidth: 520, borderCollapse: "collapse" }}>
+                    <Box component="thead">
+                      <Box component="tr">
+                        <Box component="th" sx={{ ...headCellSx, width: 80 }}>ID</Box>
+                        <Box component="th" sx={headCellSx}>Cycle No</Box>
+                        <Box component="th" sx={headCellSx}>Controller No</Box>
+                        <Box component="th" sx={headCellSx}>State</Box>
+                        <Box
+                          component="th"
+                          sx={{ ...headCellSx, textAlign: "right", width: 110 }}
                         >
-                          {/* ID */}
+                          Actions
+                        </Box>
+                      </Box>
+                    </Box>
 
-                          <TableCell>
-                            <Typography variant="overline" color="text.secondary">
-                              #{String(c.id).padStart(2, "0")}
-                            </Typography>
-                          </TableCell>
+                    <Box component="tbody">
+                      {rows.map((c) => {
+                        const selected = form.id === c.id && panel === "edit";
+                        const allocated = allocatedIds.has(c.id);
 
-                          {/* CYCLE NUMBER */}
-
-                          <TableCell>
-                            <Box component="span" sx={{ display: "inline-flex", px: 1, py: 0.4, borderRadius: 1, backgroundColor: "action.hover", color: "text.primary", fontFamily: '"JetBrains Mono", monospace', fontSize: 12, fontWeight: 600, letterSpacing: "0.04em" }}>
-                              {c.cycle_no}
+                        return (
+                          <Box
+                            component="tr"
+                            key={c.id}
+                            onClick={() => openEdit(c)}
+                            sx={{
+                              cursor: "pointer",
+                              bgcolor: selected ? "action.selected" : "transparent",
+                              "&:hover": { bgcolor: "action.hover" },
+                              "& > td": {
+                                borderBottom: "1px solid",
+                                borderColor: "divider",
+                                py: 1,
+                                px: 1.5,
+                              },
+                            }}
+                          >
+                            {/* ID */}
+                            <Box component="td">
+                              <Typography variant="overline" color="text.secondary">
+                                #{String(c.id).padStart(2, "0")}
+                              </Typography>
                             </Box>
-                          </TableCell>
 
-                          {/* CONTROLLER */}
-
-                          <TableCell>
-                            <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: "0.04em" }}>
-                              {c.controller_no}
-                            </Typography>
-                          </TableCell>
-
-                          {/* STATE */}
-
-                          <TableCell>
-                            {allocated ? (
-                              <Chip
-                                size="small"
-                                color="success"
-                                label="Allocated"
-                                icon={
-                                  <Box
-                                    sx={{
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius:
-                                        "50%",
-                                      backgroundColor:
-                                        "success.main",
-                                    }}
-                                  />
-                                }
+                            {/* CYCLE NUMBER */}
+                            <Box component="td">
+                              <Box
+                                component="span"
                                 sx={{
-                                  "& .MuiChip-icon":
-                                    {
-                                      ml: 1,
-                                    },
+                                  display: "inline-flex",
+                                  px: 1,
+                                  py: 0.4,
+                                  borderRadius: 1,
+                                  backgroundColor: "action.hover",
+                                  color: "text.primary",
+                                  fontFamily: '"JetBrains Mono", monospace',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  letterSpacing: "0.04em",
                                 }}
-                              />
-                            ) : (
-                              <Chip
-                                size="small"
-                                label="Unallocated"
-                                variant="outlined"
-                                icon={
-                                  <Box
-                                    sx={{
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius:
-                                        "50%",
-                                      backgroundColor:
-                                        "text.disabled",
+                              >
+                                {c.cycle_no}
+                              </Box>
+                            </Box>
+
+                            {/* CONTROLLER */}
+                            <Box component="td">
+                              <Typography
+                                variant="overline"
+                                color="text.secondary"
+                                sx={{ letterSpacing: "0.04em" }}
+                              >
+                                {c.controller_no}
+                              </Typography>
+                            </Box>
+
+                            {/* STATE */}
+                            <Box component="td">
+                              {allocated ? (
+                                <Chip
+                                  size="small"
+                                  color="success"
+                                  label="Allocated"
+                                  icon={
+                                    <Box
+                                      sx={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: "50%",
+                                        backgroundColor: "success.main",
+                                      }}
+                                    />
+                                  }
+                                  sx={{ "& .MuiChip-icon": { ml: 1 } }}
+                                />
+                              ) : (
+                                <Chip
+                                  size="small"
+                                  label="Unallocated"
+                                  variant="outlined"
+                                  icon={
+                                    <Box
+                                      sx={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: "50%",
+                                        backgroundColor: "text.disabled",
+                                      }}
+                                    />
+                                  }
+                                  sx={{
+                                    color: "text.secondary",
+                                    borderColor: "divider",
+                                    "& .MuiChip-icon": { ml: 1 },
+                                  }}
+                                />
+                              )}
+                            </Box>
+
+                            {/* ACTIONS */}
+                            <Box component="td" sx={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                              <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                                <Tooltip title="Edit cycle">
+                                  <IconButton
+                                    size="small"
+                                    aria-label={`Edit ${c.cycle_no}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEdit(c);
                                     }}
-                                  />
-                                }
-                                sx={{
-                                  color:
-                                    "text.secondary",
-                                  borderColor:
-                                    "divider",
-                                  "& .MuiChip-icon":
-                                    {
-                                      ml: 1,
-                                    },
-                                }}
-                              />
-                            )}
-                          </TableCell>
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
 
-                          {/* ACTIONS */}
-
-                          <TableCell
-  align="right"
-  sx={{
-    width: 110,
-    minWidth: 110,
-    whiteSpace: "nowrap",
-  }}
->
-  <Stack
-    direction="row"
-    spacing={0.5}
-    justifyContent="flex-end"
-    alignItems="center"
-    sx={{
-      width: "100%",
-    }}
-  >
-    <Tooltip title="Edit cycle">
-      <IconButton
-        size="small"
-        aria-label={`Edit ${c.cycle_no}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          openEdit(c);
-        }}
-      >
-        <EditIcon fontSize="small" />
-      </IconButton>
-    </Tooltip>
-
-    <Tooltip title="Delete cycle">
-      <IconButton
-        size="small"
-        color="error"
-        aria-label={`Delete ${c.cycle_no}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          setDeleteTarget(c);
-        }}
-      >
-        <DeleteIcon fontSize="small" />
-      </IconButton>
-    </Tooltip>
-  </Stack>
-</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                                <Tooltip title="Delete cycle">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    aria-label={`Delete ${c.cycle_no}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteTarget(c);
+                                    }}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
 
               <Box sx={{ flexShrink: 0 }}>
                 <Pager
@@ -1100,10 +1016,12 @@ function CycleSection({ onDataChange }) {
         </Grid>
 
         {/* =================================================
-            INSPECTOR
+            INSPECTOR — always rendered, a side column from
+            `lg` up, a full-width block stacked under the list
+            below that
             ================================================= */}
 
-        <Grid size={{ xs: 12, lg: 4 }}>
+        <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0 }}>
           {(panel === "new" || panel === "edit") && (
             <Paper
               component="form"
@@ -1111,7 +1029,7 @@ function CycleSection({ onDataChange }) {
               onSubmit={submit}
               noValidate
               sx={{
-                p: 2.5,
+                p: { xs: 2, sm: 2.5 },
                 border: 1,
                 borderColor: "divider",
                 position: "relative",
@@ -1124,27 +1042,15 @@ function CycleSection({ onDataChange }) {
                   size="small"
                   onClick={closePanel}
                   aria-label="Close form"
-                  sx={{
-                    position: "absolute",
-                    top: 10,
-                    right: 10,
-                  }}
+                  sx={{ position: "absolute", top: 10, right: 10 }}
                 >
                   <CloseIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
 
               {/* FORM HEADER */}
-              <Stack
-                direction="row"
-                alignItems="center"
-                sx={{ mb: 2.5, pr: 4 }}
-              >
-                <Stack
-                  direction="row"
-                  spacing={1.25}
-                  alignItems="center"
-                >
+              <Stack direction="row" alignItems="center" sx={{ mb: 2.5, pr: 4 }}>
+                <Stack direction="row" spacing={1.25} alignItems="center">
                   <Box
                     sx={{
                       width: 4,
@@ -1155,39 +1061,33 @@ function CycleSection({ onDataChange }) {
                   />
 
                   <Typography variant="h6">
-                    {panel === "edit"
-                      ? `Edit ${form.cycle_no || "cycle"}`
-                      : "New cycle"}
+                    {panel === "edit" ? `Edit ${form.cycle_no || "cycle"}` : "New cycle"}
                   </Typography>
                 </Stack>
               </Stack>
 
-              <Divider
-                sx={{
-                  mb: 2.5,
-                }}
-              />
+              <Divider sx={{ mb: 2.5 }} />
 
               <Stack spacing={2}>
                 {/* CYCLE NUMBER */}
-
                 <TextField
                   id="cycle_no"
                   name="cycle_no"
                   label="Cycle No"
                   required
-                  autoFocus
+                  autoFocus={!isMobile}
                   fullWidth
                   value={form.cycle_no}
                   onChange={onField}
                   placeholder="e.g. CYCLE-001"
                   error={!!cycleNoError}
                   helperText={cycleNoError}
-                  inputProps={{ sx: { fontFamily: '"JetBrains Mono", monospace', letterSpacing: "0.04em" } }}
+                  inputProps={{
+                    sx: { fontFamily: '"JetBrains Mono", monospace', letterSpacing: "0.04em" },
+                  }}
                 />
 
                 {/* CONTROLLER NUMBER */}
-
                 <TextField
                   id="controller_no"
                   name="controller_no"
@@ -1199,30 +1099,25 @@ function CycleSection({ onDataChange }) {
                   placeholder="e.g. CTRL-ABC-123"
                   error={!!controllerError}
                   helperText={controllerError}
-                  inputProps={{ sx: { fontFamily: '"JetBrains Mono", monospace', letterSpacing: "0.04em" } }}
+                  inputProps={{
+                    sx: { fontFamily: '"JetBrains Mono", monospace', letterSpacing: "0.04em" },
+                  }}
                 />
 
                 {/* FORM ERROR */}
-
-                {errors.form && (
-                  <Alert severity="error">
-                    {errors.form}
-                  </Alert>
-                )}
+                {errors.form && <Alert severity="error">{errors.form}</Alert>}
 
                 {/* ACTIONS */}
-
                 <Stack
-                  direction="row"
+                  direction={{ xs: "column-reverse", sm: "row" }}
                   justifyContent="flex-end"
                   spacing={1}
-                  sx={{
-                    pt: 0.5,
-                  }}
+                  sx={{ pt: 0.5 }}
                 >
                   <Button
                     type="button"
                     variant="outlined"
+                    fullWidth={isMobile}
                     onClick={closePanel}
                     disabled={saving}
                   >
@@ -1232,23 +1127,13 @@ function CycleSection({ onDataChange }) {
                   <Button
                     type="submit"
                     variant="contained"
+                    fullWidth={isMobile}
                     disabled={saving}
                     startIcon={
-                      saving ? (
-                        <CircularProgress
-                          size={16}
-                          color="inherit"
-                        />
-                      ) : (
-                        <SaveIcon />
-                      )
+                      saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />
                     }
                   >
-                    {saving
-                      ? "Saving..."
-                      : panel === "edit"
-                      ? "Update cycle"
-                      : "Save cycle"}
+                    {saving ? "Saving..." : panel === "edit" ? "Update cycle" : "Save cycle"}
                   </Button>
                 </Stack>
               </Stack>
@@ -1271,5 +1156,18 @@ function CycleSection({ onDataChange }) {
     </Stack>
   );
 }
+
+const headCellSx = {
+  textAlign: "left",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "text.secondary",
+  textTransform: "uppercase",
+  letterSpacing: 0.4,
+  py: 1,
+  px: 1.5,
+  borderBottom: "1px solid",
+  borderColor: "divider",
+};
 
 export default CycleSection;

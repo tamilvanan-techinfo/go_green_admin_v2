@@ -1,13 +1,21 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$ZipPath
+    [string]$ZipPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ExperienceName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ExeName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$EnvVarName
 )
 
 $ErrorActionPreference = "Stop"
 $stage = $null
-$exeName = "electricity_power_monitoring_fe.exe"
 
-function Write-Status { param([string]$Message) Write-Output "[GoGreen] $Message" }
+function Write-Status { param([string]$Message) Write-Output "[$ExperienceName] $Message" }
 
 function Test-WritableDirectory {
     param([string]$Path)
@@ -28,8 +36,8 @@ try {
     }
 
     $destinations = @(
-        "C:\ProgramData\GoGreen\GoGreen_Receiver",
-        "$env:ProgramFiles\GoGreen\GoGreen_Receiver"
+        "C:\ProgramData\$ExperienceName\${ExperienceName}_Receiver",
+        "$env:ProgramFiles\$ExperienceName\${ExperienceName}_Receiver"
     )
 
     $destination = $null
@@ -42,20 +50,20 @@ try {
 
     Write-Status "Receiver destination: $destination"
 
-    $stage = Join-Path $env:TEMP ("GoGreenReceiver_" + [guid]::NewGuid().ToString("N"))
+    $stage = Join-Path $env:TEMP ("${ExperienceName}Receiver_" + [guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
     Expand-Archive -LiteralPath $ZipPath -DestinationPath $stage -Force
 
     # The folder that contains the exe may be the root or one level down.
     $receiverRoot = $null
-    if (Test-Path (Join-Path $stage $exeName) -PathType Leaf) {
+    if (Test-Path (Join-Path $stage $ExeName) -PathType Leaf) {
         $receiverRoot = $stage
     } else {
         $receiverRoot = Get-ChildItem -LiteralPath $stage -Directory -Recurse |
-            Where-Object { Test-Path (Join-Path $_.FullName $exeName) -PathType Leaf } |
+            Where-Object { Test-Path (Join-Path $_.FullName $ExeName) -PathType Leaf } |
             Select-Object -First 1 -ExpandProperty FullName
     }
-    if (-not $receiverRoot) { throw "The ZIP does not contain $exeName." }
+    if (-not $receiverRoot) { throw "The ZIP does not contain $ExeName." }
 
     # Clean old version so removed files don't linger, then copy.
     Get-ChildItem -LiteralPath $destination -Force -ErrorAction SilentlyContinue |
@@ -68,18 +76,18 @@ try {
     Remove-Item -LiteralPath $stage -Recurse -Force
     $stage = $null
 
-    if (-not (Test-Path (Join-Path $destination $exeName) -PathType Leaf)) {
-        throw "Extraction finished but $exeName is missing in $destination."
+    if (-not (Test-Path (Join-Path $destination $ExeName) -PathType Leaf)) {
+        throw "Extraction finished but $ExeName is missing in $destination."
     }
 
-    [Environment]::SetEnvironmentVariable("GoGreen_RECEIVER_DIR", $destination, "User")
-    $env:GoGreen_RECEIVER_DIR = $destination
+    [Environment]::SetEnvironmentVariable($EnvVarName, $destination, "User")
+    Set-Item -Path "env:$EnvVarName" -Value $destination
 
     Write-Status "Receiver installation completed successfully."
     exit 0
 }
 catch {
-    Write-Output "[GoGreen] ERROR: $($_.Exception.Message)"
+    Write-Output "[$ExperienceName] ERROR: $($_.Exception.Message)"
     exit 1
 }
 finally {

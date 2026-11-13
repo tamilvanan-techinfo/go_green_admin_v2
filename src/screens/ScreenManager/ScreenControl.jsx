@@ -157,10 +157,10 @@ function ScreenControl() {
 
     const loadReceiverStatus = async () => {
       try {
-        const running = await invoke("get_receiver_status");
+        const status = await invoke("get_receiver_status");
 
         if (active) {
-          setReceiverOn(Boolean(running));
+          setReceiverOn(Boolean(status?.running));
         }
       } catch (error) {
         console.error("Could not load LED UI status:", error);
@@ -300,11 +300,10 @@ function ScreenControl() {
           : await invoke("stop_receiver");
 
         if (checked) {
-          // Receiver takes a moment to actually come up.
           setTimeout(async () => {
             try {
-              const running = await invoke("get_receiver_status");
-              setReceiverOn(Boolean(running));
+              const status = await invoke("get_receiver_status");
+              setReceiverOn(Boolean(status?.running));
             } catch {
               setReceiverOn(Boolean(result?.success));
             }
@@ -327,8 +326,8 @@ function ScreenControl() {
         console.error("Failed to toggle LED UI:", error);
 
         try {
-          const running = await invoke("get_receiver_status");
-          setReceiverOn(Boolean(running));
+          const status = await invoke("get_receiver_status");
+          setReceiverOn(Boolean(status?.running));
         } catch {
           // Keep last known state.
         }
@@ -433,12 +432,21 @@ function ScreenControl() {
     return (
       <Box
         sx={{
-          width: "100%",
-          maxWidth: 440,
-          mx: "auto",
-          p: 1.5,
-          boxSizing: "border-box",
-        }}
+  width: "100%",
+  maxWidth: 440,
+  height: "100%",
+  minHeight: 0,
+  mx: "auto",
+  p: 1.5,
+  boxSizing: "border-box",
+  overflowY: "auto",
+  overflowX: "hidden",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none",
+  "&::-webkit-scrollbar": {
+    display: "none",
+  },
+}}
       >
         <Paper
           elevation={0}
@@ -461,13 +469,21 @@ function ScreenControl() {
   return (
     <Box
       sx={{
-        width: "100%",
-        maxWidth: 440,
-        mx: "auto",
-        p: 1.5,
-        boxSizing: "border-box",
-        fontFamily: "Inter, sans-serif",
-      }}
+  width: "100%",
+  maxWidth: 440,
+  height: "100%",
+  minHeight: 0,
+  mx: "auto",
+  p: 1.5,
+  boxSizing: "border-box",
+  overflowY: "auto",
+  overflowX: "hidden",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none",
+  "&::-webkit-scrollbar": {
+    display: "none",
+  },
+}}
     >
       <Paper
         component="section"

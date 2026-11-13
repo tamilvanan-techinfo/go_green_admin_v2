@@ -16,7 +16,7 @@ const READINGS_URL = (id) => `${api.apiBase}/api/admin/participants/${id}/readin
 const GAMES = [
   { id: "go-green", title: "Go Green", icon: "eco" },
   { id: "fanpower", title: "Fanpower", icon: "air" },
-  { id: "expo", title: "Expo", icon: "auto_awesome" },
+
 ];
 
 async function getJson(url) {
@@ -265,7 +265,7 @@ function Dashboard() {
           {/* ─── Power Output card — live scrolling trend, no fixed ceiling ─── */}
           <Paper elevation={0} sx={PANEL_SX}>
             <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-              <Typography sx={{ ...cardTitleSx, flex: 1 }}>Instantaneous Microgrid Output</Typography>
+              <Typography sx={{ ...cardTitleSx, flex: 1 }}>Instantaneous Output</Typography>
               <Chip label="live" size="small" sx={{ fontFamily, fontSize: 10, fontWeight: 700, bgcolor: C.activeChipBg, color: C.activeChipText, flexShrink: 0 }} />
             </Box>
 

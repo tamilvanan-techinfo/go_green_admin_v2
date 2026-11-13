@@ -31,6 +31,7 @@ import SettingsSuggestRoundedIcon from "@mui/icons-material/SettingsSuggestRound
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import MonitorRoundedIcon from "@mui/icons-material/MonitorRounded";
+import { useToast } from "../Allocations/Ui";
 
 import BottomSheet from "../../components/BottonSheet";
 import { useSocket } from "../../context/SocketContext";
@@ -223,12 +224,13 @@ function SettingTile({ field, label, description, checked, onChange }) {
   );
 }
 
-function AddNewWindow({ onClose, onCreated }) {
+function AddNewWindow({ onClose, onCreated, selectedExperience }) {
   const [form, setForm] = useState(initialForm);
   const [screens, setScreens] = useState([]);
   const [loadingScreens, setLoadingScreens] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const toast = useToast();
   const {send} = useSocket()
   const selectedScreen = useMemo(
     () =>
@@ -270,12 +272,12 @@ function AddNewWindow({ onClose, onCreated }) {
       setScreens(screenList);
 
       if (screenList.length === 0) {
-        setError(
+        toast(
           "No screens are available. Create a screen before adding a window."
         );
       }
     } catch (err) {
-      setError(
+      toast(
         err.message ||
           "Could not connect to the backend while loading screens."
       );
@@ -286,7 +288,7 @@ function AddNewWindow({ onClose, onCreated }) {
 
   useEffect(() => {
     fetchScreens();
-  }, [fetchScreens]);
+  }, [selectedExperience, fetchScreens]);
 
   const updateField = (field, value) => {
     setForm((previous) => ({
@@ -330,12 +332,12 @@ function AddNewWindow({ onClose, onCreated }) {
     setError("");
 
     if (!form.name.trim()) {
-      setError("Please enter a window name.");
+      toast("Please enter a window name.");
       return;
     }
 
     if (!form.activee_screen) {
-      setError("Please select a screen to assign to this window.");
+      toast("Please select a screen to assign to this window.");
       return;
     }
 
@@ -350,7 +352,7 @@ function AddNewWindow({ onClose, onCreated }) {
       width < 1 ||
       height < 1
     ) {
-      setError("Width and height must be valid numbers greater than zero.");
+      toast("Width and height must be valid numbers greater than zero.");
       return;
     }
 
@@ -359,7 +361,7 @@ function AddNewWindow({ onClose, onCreated }) {
       opacity < 0 ||
       opacity > 1
     ) {
-      setError("Opacity must be between 0 and 1.");
+      toast("Opacity must be between 0 and 1.");
       return;
     }
 
@@ -416,7 +418,7 @@ function AddNewWindow({ onClose, onCreated }) {
       onCreated?.(result);
       onClose?.();
     } catch (err) {
-      setError(
+      toast(
         err.message || "Unable to create the window. Please try again."
       );
     } finally {

@@ -30,11 +30,14 @@ import TvOffIcon from "@mui/icons-material/TvOff";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import MonitorIcon from "@mui/icons-material/Monitor";
 import { useSocket } from "../../context/SocketContext";
-import { useGame } from "../../context/GameContext";
+import { useToast } from "../Allocations/Ui";
+import { invoke } from "@tauri-apps/api/core";
+
 import { GAMES } from "../../constants/game";
+import api from "../../config.json"
 
 // ─── Design tokens ───────────────────────────────────────────
-const API_BASE = "http://localhost:8000";
+const API_BASE = api.apiBase;
 
 const THUMB_H = 100;
 const HEADER_H = 48;
@@ -84,16 +87,19 @@ const ScreenCard = styled("div", {
 }));
 
 // ─── Component ───────────────────────────────────────────────
-export default function Screens({ handleControlFor }) {
+export default function Screens({ handleControlFor, selectedGame }) {
   const theme = useTheme();
   const { send } = useSocket();
-  const { selectedGame } = useGame();
-
+  const toast = useToast();
+ 
+ 
   const [screens, setScreens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [form, setForm] = useState(emptyForm());
+
+
 
   const selectedGameTitle =
     GAMES.find((g) => g.id === selectedGame)?.title || "";
@@ -162,7 +168,7 @@ export default function Screens({ handleControlFor }) {
     event.preventDefault();
 
     if (!form.game) {
-      alert("Please select a game.");
+      toast("No game experience selected. Go to Change Game first.");
       return;
     }
 
@@ -199,12 +205,7 @@ export default function Screens({ handleControlFor }) {
         }
       }
 
-      // Saved under a different game than the one being viewed:
-      // it won't appear in this list, so tell the user.
-      if (form.game !== selectedGame) {
-        const title = GAMES.find((g) => g.id === form.game)?.title || form.game;
-        alert(`Screen saved under ${title}. Switch to that game to see it.`);
-      }
+  
 
       closeDialog();
       await fetchScreens();
@@ -260,53 +261,9 @@ export default function Screens({ handleControlFor }) {
 
   // ─── Card renderer ────────────────────────────────────────
   const renderScreenCard = (screen) => (
-    <ScreenCard key={screen.id} islive={Boolean(screen.is_live)}>
-      {/* LIVE badge */}
-      {screen.is_live && (
-        <Box
-          sx={{
-            position: "absolute",
-            top: -8,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 5,
-            height: 17,
-            minWidth: 100,
-            px: 1,
-            boxSizing: "border-box",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 0.6,
-            bgcolor: "#059669",
-            color: "#FFFFFF",
-            borderRadius: "7px",
-            border: "1px solid #10B981",
-            fontSize: 8.5,
-            fontWeight: 800,
-            lineHeight: 1,
-            letterSpacing: 0.3,
-            whiteSpace: "nowrap",
-            boxShadow: "0 2px 6px rgba(5,150,105,0.22)",
-          }}
-        >
-          <Box
-            sx={{
-              width: 5,
-              height: 5,
-              flexShrink: 0,
-              borderRadius: "50%",
-              bgcolor: "#BBF7D0",
-              animation: "livePulse 1.5s ease-in-out infinite",
-              "@keyframes livePulse": {
-                "0%, 100%": { opacity: 1, transform: "scale(1)" },
-                "50%": { opacity: 0.55, transform: "scale(0.8)" },
-              },
-            }}
-          />
-          BROADCASTING
-        </Box>
-      )}
+    <ScreenCard key={screen.id} islive={false}>
+
+
 
       {/* Title + path */}
       <Box
@@ -405,35 +362,17 @@ export default function Screens({ handleControlFor }) {
       </Box>
 
       {/* Status row */}
-      <Box
-        sx={{
-          height: STATUS_H,
-          minHeight: STATUS_H,
-          px: 1.5,
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: 0.6,
-          overflow: "hidden",
-        }}
-      >
-        <Typography sx={{ flexShrink: 0, fontSize: 11, lineHeight: 1, color: "text.secondary" }}>
-          Status:
-        </Typography>
-        <Chip
-          label={screen.is_live ? "Live" : "Offline"}
-          size="small"
-          sx={{
-            height: 18,
-            flexShrink: 0,
-            fontSize: 10,
-            fontWeight: 600,
-            bgcolor: screen.is_live ? "#D1FAE5" : "background.default",
-            color: screen.is_live ? "#047857" : "text.secondary",
-            border: `1px solid ${screen.is_live ? "#6EE7B7" : theme.palette.divider}`,
-            "& .MuiChip-label": { px: 0.6 },
-          }}
-        />
+      <Box sx={{
+        height: STATUS_H,
+        minHeight: STATUS_H,
+        px: 1.5,
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 0.6,
+        overflow: "hidden",
+      }}>
+        
         {screen.resolution && (
           <Chip
             label={screen.resolution}
@@ -471,7 +410,7 @@ export default function Screens({ handleControlFor }) {
         <Button
           fullWidth
           size="small"
-          variant={screen.is_live ? "contained" : "outlined"}
+          variant={ "outlined"}
           startIcon={<SettingsIcon sx={{ fontSize: "13px !important" }} />}
           onClick={() => handleControlFor(screen.path)}
           sx={{
@@ -482,20 +421,7 @@ export default function Screens({ handleControlFor }) {
             fontSize: 10,
             letterSpacing: 0.2,
             textTransform: "none",
-            ...(screen.is_live
-              ? {
-                  bgcolor: "#065F46",
-                  color: "#FFFFFF",
-                  border: "1px solid #065F46",
-                  boxShadow: "none",
-                  "& .MuiButton-startIcon": { color: "#34D399", marginRight: "5px" },
-                  "&:hover": {
-                    bgcolor: "#064E3B",
-                    borderColor: "#064E3B",
-                    boxShadow: "0 2px 8px rgba(6,95,70,0.18)",
-                  },
-                }
-              : {
+           
                   borderColor: theme.palette.divider,
                   color: "text.secondary",
                   "& .MuiButton-startIcon": { marginRight: "5px" },
@@ -504,7 +430,6 @@ export default function Screens({ handleControlFor }) {
                     color: "text.primary",
                     bgcolor: "transparent",
                   },
-                }),
           }}
         >
           Control Screen
@@ -583,32 +508,12 @@ export default function Screens({ handleControlFor }) {
 
       {/* Grid */}
       <Box sx={{ px: { xs: 1.5, sm: 2 }, pb: { xs: 1.5, sm: 2 } }}>
-        {!selectedGame ? (
-          <Box
-            sx={{
-              py: 6,
-              textAlign: "center",
-              color: "text.secondary",
-              border: `1px dashed ${theme.palette.divider}`,
-              borderRadius: "10px",
-            }}
-          >
-            <TvOffIcon sx={{ fontSize: 32, mb: 1, opacity: 0.3 }} />
-            <Typography fontWeight={600} fontSize={13}>
-              No experience selected
-            </Typography>
-            <Typography sx={{ mt: 0.5, fontSize: 11 }}>
-              Choose Go Green, Fanpower or Expo in Settings → Change Game.
-            </Typography>
-          </Box>
-        ) : loading ? (
-          <Grid container spacing={1.5} alignItems="stretch">
+        {loading ? (
+          <Stack spacing={1.5} alignItems="stretch">
             {Array.from({ length: 6 }).map((_, index) => (
-              <Grid key={index} item xs={6} sm={4} md={3} lg={2} xl={2}>
-                <SkeletonCard />
-              </Grid>
+              <SkeletonCard key={index} />
             ))}
-          </Grid>
+          </Stack>
         ) : screens.length === 0 ? (
           <Box
             sx={{
@@ -678,23 +583,9 @@ export default function Screens({ handleControlFor }) {
               placeholder="/welcome"
               helperText="URL route where this screen is accessible"
             />
-            <TextField
-              select
-              label="Game"
-              name="game"
-              value={form.game}
-              onChange={handleFormChange}
-              required
-              size="small"
-              fullWidth
-              helperText="Which experience this screen belongs to"
-            >
-              {GAMES.map((g) => (
-                <MenuItem key={g.id} value={g.id}>
-                  {g.title}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Experience: <strong>{selectedGameTitle || "none selected"}</strong>
+            </Typography>
             <FormControlLabel
               control={
                 <Switch

@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Alert,
   Box,
@@ -11,7 +11,8 @@ import {
   Typography,
 } from "@mui/material";
 import { useToast } from '../Allocations/Ui'
-import { useGame } from "../../context/GameContext";
+import { invoke } from "@tauri-apps/api/core";
+
 
 // ─── Design tokens: matched to BackendSettings.jsx ────────────────────────────
 const C = {
@@ -48,15 +49,7 @@ const GAMES = [
     iconBg: "linear-gradient(135deg, #164e63 0%, #0891b2 100%)",
     tag: "Fanpower",
   },
-  {
-    id: "expo",
-    title: "Expo",
-    subtitle: "Expo Experience",
-    description: "Select the Expo experience.",
-    icon: "event",
-    iconBg: "linear-gradient(135deg, #4338ca 0%, #818cf8 100%)",
-    tag: "Expo",
-  },
+ 
 ];
 
 // ─── Shared typography ────────────────────────────────────────────────────────
@@ -79,12 +72,28 @@ const bodyTextSx = {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function GameChange() {
+  const [selectedGame, setSelectedGameState] = useState(null);
+  const [switching, setSwitching] = useState(false);
   const toast = useToast();
-  const {selectedGame, setSelectedGame} = useGame();
 
-  const handleSelect = (game) => {
-    setSelectedGame(game.id);
-    toast(`${game.title} selected.`);
+  useEffect(() => {
+    invoke("get_selected_experience")
+      .then((exp) => setSelectedGameState(exp))
+      .catch(() => setSelectedGameState(null));
+  }, []);
+ 
+
+  const handleSelect = async (game) => {
+    setSwitching(true);
+    try {
+      await invoke("set_selected_experience", { experience: game.id });
+      setSelectedGameState(game.id);
+      toast(`${game.title} selected.`);
+    } catch (err) {
+      toast(`Could not select ${game.title}: ${err}`, "error");
+    } finally {
+      setSwitching(false);
+    }
   };
 
   return (

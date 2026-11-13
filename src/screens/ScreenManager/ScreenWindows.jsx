@@ -376,7 +376,7 @@ function WindowCard({
             </Typography>
           </Box>
 
-          <Button
+          {/* <Button
             size="small"
             variant="outlined"
             endIcon={
@@ -417,7 +417,7 @@ function WindowCard({
             }}
           >
             Change
-          </Button>
+          </Button> */}
 
           <Menu
             anchorEl={menuAnchor}
@@ -613,7 +613,7 @@ function DeleteWindowDialog({ open, windowItem, busy, onConfirm, onCancel }) {
 
 // ─── ScreenWindows ────────────────────────────────────────────────────────────
 
-function ScreenWindows() {
+function ScreenWindows({ selectedGame }) {
   const [windows, setWindows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -684,10 +684,12 @@ function ScreenWindows() {
       setWindows((prev) => prev.map((w) => (same(w) ? merge(w) : w)));
       setSelectedWindowData((prev) => (prev && same(prev) ? merge(prev) : prev));
     };
+    fetchWindows({silent : true});
+    
 
     window.addEventListener("window-config-pushed", onPushed);
     return () => window.removeEventListener("window-config-pushed", onPushed);
-  }, []);
+  }, [fetchWindows]);
 
 
   const confirmDeleteWindow = useCallback(async () => {
@@ -736,17 +738,18 @@ function ScreenWindows() {
 
   const handleOnWindowCreated = useCallback(
    async (data) => {
+      await fetchWindows({ silent: true });
       if (!data?.id) return;
-      setWindows((prev) =>
-        prev.some(({ id }) => id === data.id) ? prev : [...prev, data]
-      );
+      // setWindows((prev) =>
+      //   prev.some(({ id }) => id === data.id) ? prev : [...prev, data]
+      // );
       const running = await invoke('is_electron_running')
       console.log("is receiver is running",running)
       if(running){
         send({ type: "create_window", data });
       }
     },
-    [send]
+    [fetchWindows,send]
   );
 
   const onlineCount = useMemo(
@@ -1098,14 +1101,14 @@ function ScreenWindows() {
       )}
 
       {openAddNewWindow && (
-        <AddNewWindow
+        <AddNewWindow selectedExperience={selectedGame}
           onClose={() => setOpenAddNewWindow(false)}
           onCreated={handleOnWindowCreated}
         />
       )}
 
       {editWindow && (
-        <EditWindow
+        <EditWindow selectedExperience={selectedGame}
           onClose={() => setEditWindow(false)}
           selectedWindow={selectedWindowData}
         />

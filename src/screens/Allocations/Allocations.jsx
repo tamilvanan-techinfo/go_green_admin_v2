@@ -220,18 +220,13 @@ function Allocations() {
             aria-label="Allocations sections"
             sx={{
               display: "grid",
-              gridTemplateColumns: {
-                xs: "repeat(2, minmax(0, 1fr))",
-                sm: "repeat(2, minmax(0, 1fr))",
-                lg: "repeat(3, minmax(0, 1fr))",
-              },
-              gap: { xs: 1, sm: 1.25 },
-              p: { xs: 0.75, sm: 1 },
-              mt: 1,
-              mb: { xs: 1.5, md: 2.5 },
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: { xs: 0.5, md: 0.75, lg: 1, xl: 1.25 },
+              p: { xs: 0.5, md: 0.75, lg: 1 },
+              mb: { xs: 1.5, md: 2, lg: 2.5 },
               bgcolor: "#F4F6FF",
               border: "1px solid #D9DEEE",
-              borderRadius: { xs: "12px", sm: "16px" },
+              borderRadius: "12px",
               width: "100%",
               boxSizing: "border-box",
               flexShrink: 0,

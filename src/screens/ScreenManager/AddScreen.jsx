@@ -11,14 +11,14 @@ import {
   MenuItem,
   CircularProgress,
 } from "@mui/material";
-
+import { invoke } from "@tauri-apps/api/core";
 import AddIcon from "@mui/icons-material/Add";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 import api from "../../config.json";
 import { GAMES } from "../../constants/game";
-import { useGame } from "../../context/GameContext";
+
 import { useToast } from "../Allocations/Ui";
 
 const SCREENS_URL = `${api.apiBase}/api/admin/screens/`;
@@ -64,9 +64,9 @@ const fieldSx = (mono = false) => ({
 function AddScreen({ onCreated }) {
   const fileInputRef = useRef(null);
   const toast = useToast();
-  const { selectedGame } = useGame();
+  
 
-  const [game, setGame] = useState(selectedGame || "");
+  const [game, setGame] = useState("");
   const [screenName, setScreenName] = useState("");
   const [route, setRoute] = useState("");
   const [image, setImage] = useState(null);
@@ -76,9 +76,10 @@ function AddScreen({ onCreated }) {
   // If the user picks an experience in Change Game after this form
   // opened, and hasn't chosen a game here yet, follow it.
   useEffect(() => {
-    if (!game && selectedGame) setGame(selectedGame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGame]);
+    invoke("get_selected_experience")
+      .then((exp) => setGame(exp || ""))
+      .catch(() => setGame(""));
+  }, []);
 
   const applyImage = (file) => {
     if (!file) return;
@@ -122,7 +123,7 @@ function AddScreen({ onCreated }) {
     setScreenName("");
     setRoute("");
     removeImage();
-    setGame(selectedGame || "");
+   
   };
 
   const handleSubmit = async (event) => {
@@ -134,7 +135,7 @@ function AddScreen({ onCreated }) {
     }
 
     if (!game) {
-      toast("Please select a game.", "error");
+      toast("No game experience selected. Go to Change Game first.", "error");
       return;
     }
 
@@ -296,27 +297,14 @@ function AddScreen({ onCreated }) {
         </Box>
 
         {/* Game */}
+        {/* Game (read-only, follows the active experience) */}
         <Box sx={{ mb: 2 }}>
-          <TextField
-            select
-            fullWidth
-            required
-            size="small"
-            label="Game"
-            value={game}
-            onChange={(event) => setGame(event.target.value)}
-            disabled={saving}
-            sx={fieldSx()}
-            SelectProps={{
-              MenuProps: { sx: { zIndex: 100000 } },
-            }}
-          >
-            {GAMES.map((g) => (
-              <MenuItem key={g.id} value={g.id} sx={{ fontSize: 13 }}>
-                {g.title}
-              </MenuItem>
-            ))}
-          </TextField>
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary", mb: 0.5 }}>
+            ADDING TO
+          </Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "text.primary" }}>
+            {GAMES.find((g) => g.id === game)?.title || "No experience selected"}
+          </Typography>
         </Box>
 
         {/* Upload heading */}
